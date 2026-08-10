@@ -10,6 +10,7 @@ const PNG_IMAGE_BYTES = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=",
   "base64",
 );
+const JPEG_IMAGE_BYTES = Buffer.from("ffd8ffe000104a46494600010100000100010000ffd9", "hex");
 
 describe("current-turn image cache stability", () => {
   it("dedupes the same image arriving through prepared and attachment paths", async () => {
@@ -46,9 +47,8 @@ describe("current-turn image cache stability", () => {
 
   it("preserves genuinely different images across current-turn paths", async () => {
     await withTempDir({ prefix: "openclaw-current-turn-distinct-images-" }, async (base) => {
-      const imagePath = path.join(base, "second.png");
-      const secondImageBytes = Buffer.from("different-image-bytes");
-      await fs.writeFile(imagePath, secondImageBytes);
+      const imagePath = path.join(base, "second.jpg");
+      await fs.writeFile(imagePath, JPEG_IMAGE_BYTES);
       const inlineImage = {
         type: "image" as const,
         data: PNG_IMAGE_BYTES.toString("base64"),
@@ -61,7 +61,7 @@ describe("current-turn image cache stability", () => {
           media: [
             {
               path: imagePath,
-              contentType: "image/png",
+              contentType: "image/jpeg",
               kind: "image",
               workspaceDir: base,
             },
@@ -73,7 +73,8 @@ describe("current-turn image cache stability", () => {
 
       expect(result.images).toHaveLength(2);
       expect(result.images?.[0]).toEqual(inlineImage);
-      expect(result.images?.[1]?.data).toBe(secondImageBytes.toString("base64"));
+      expect(result.images?.[1]?.data).toBe(JPEG_IMAGE_BYTES.toString("base64"));
+      expect(result.images?.[1]?.mimeType).toBe("image/jpeg");
       expect(result.imageOrder).toEqual(["inline", "inline"]);
     });
   });
