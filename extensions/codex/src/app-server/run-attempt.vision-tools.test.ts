@@ -3,21 +3,18 @@ import { describe, expect, it } from "vitest";
 import { filterToolsForVisionInputs } from "./vision-tools.js";
 
 describe("Codex dynamic tool filtering", () => {
-  it("drops the image tool when the model already has inbound vision input", () => {
-    const toolNames = filterToolsForVisionInputs(
-      [{ name: "image" }, { name: "read" }, { name: "write" }],
-      {
-        modelHasVision: true,
-        hasInboundImages: true,
-      },
-    ).map((tool) => tool.name);
+  it("keeps the image tool when the model already has inbound vision input", () => {
+    const tools = [{ name: "image" }, { name: "read" }, { name: "write" }];
+    const filtered = filterToolsForVisionInputs(tools, {
+      modelHasVision: true,
+      hasInboundImages: true,
+    });
 
-    expect(toolNames).toContain("read");
-    expect(toolNames).toContain("write");
-    expect(toolNames).not.toContain("image");
+    expect(filtered).toBe(tools);
+    expect(filtered.map((tool) => tool.name)).toEqual(["image", "read", "write"]);
   });
 
-  it("keeps the image tool unless both model vision and inbound images are present", () => {
+  it("keeps the same schema for non-vision and non-image turns", () => {
     const tools = [{ name: "image" }, { name: "read" }];
 
     expect(
