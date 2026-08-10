@@ -209,12 +209,12 @@ export async function prepareCodexAttemptTools(runtime: CodexAttemptRuntime) {
   const registeredTools = await buildDynamicTools({
     ...commonToolParams,
     // Durable registration is a thread schema, not execution authority. Keep
-    // sender ownership out of it so owner/non-owner turns share one native
-    // schema; the executable tool build above still applies real sender policy.
+    // sender ownership and current-turn image presence out of it so otherwise
+    // equivalent turns share one schema; executable tools still use real state.
     params:
-      dynamicToolParams.senderIsOwner === undefined
+      dynamicToolParams.senderIsOwner === undefined && (dynamicToolParams.images?.length ?? 0) === 0
         ? dynamicToolParams
-        : { ...dynamicToolParams, senderIsOwner: undefined },
+        : { ...dynamicToolParams, senderIsOwner: undefined, images: undefined },
     forceHeartbeatTool: true,
     ignoreDisableMessageTool: true,
     ignoreRuntimePlan: true,
