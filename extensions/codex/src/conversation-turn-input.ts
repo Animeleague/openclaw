@@ -13,6 +13,19 @@ type InboundMedia = {
 
 const IMAGE_EXTENSIONS = new Set([".avif", ".gif", ".jpeg", ".jpg", ".png", ".webp"]);
 
+function mergeUniqueMediaMetadata(plural: unknown, singular: unknown): string[] {
+  const seen = new Set<string>();
+  return normalizeSingleOrTrimmedStringList(plural)
+    .concat(normalizeSingleOrTrimmedStringList(singular))
+    .filter((value) => {
+      if (seen.has(value)) {
+        return false;
+      }
+      seen.add(value);
+      return true;
+    });
+}
+
 export function buildCodexConversationTurnInput(params: {
   prompt: string;
   event: PluginHookInboundClaimEvent;
@@ -30,15 +43,9 @@ function extractInboundMedia(event: PluginHookInboundClaimEvent): InboundMedia[]
   // OpenClaw channels expose either local staged files or remote URLs. Keep
   // them separate so Codex can receive the cheaper localImage input when a file
   // is already present, while still supporting remote-only transports.
-  const paths = normalizeSingleOrTrimmedStringList(metadata.mediaPaths).concat(
-    normalizeSingleOrTrimmedStringList(metadata.mediaPath),
-  );
-  const urls = normalizeSingleOrTrimmedStringList(metadata.mediaUrls).concat(
-    normalizeSingleOrTrimmedStringList(metadata.mediaUrl),
-  );
-  const mimeTypes = normalizeSingleOrTrimmedStringList(metadata.mediaTypes).concat(
-    normalizeSingleOrTrimmedStringList(metadata.mediaType),
-  );
+  const paths = mergeUniqueMediaMetadata(metadata.mediaPaths, metadata.mediaPath);
+  const urls = mergeUniqueMediaMetadata(metadata.mediaUrls, metadata.mediaUrl);
+  const mimeTypes = mergeUniqueMediaMetadata(metadata.mediaTypes, metadata.mediaType);
   const count = Math.max(paths.length, urls.length, mimeTypes.length);
   const media: InboundMedia[] = [];
   for (let index = 0; index < count; index += 1) {
