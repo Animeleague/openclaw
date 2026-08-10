@@ -46,4 +46,26 @@ describe("codex conversation turn input cache stability", () => {
       { type: "localImage", path: "/tmp/second.png" },
     ]);
   });
+
+  it("keeps repeated plural mime types positionally aligned", () => {
+    expect(
+      buildCodexConversationTurnInput({
+        prompt: "inspect attachments",
+        event: {
+          content: "inspect attachments",
+          channel: "discord",
+          isGroup: false,
+          metadata: {
+            mediaPaths: ["/tmp/photo", "/tmp/readme", "/tmp/notes"],
+            mediaPath: "/tmp/photo",
+            mediaTypes: ["image/png", "text/plain", "text/plain"],
+            mediaType: "image/png",
+          },
+        },
+      }),
+    ).toEqual([
+      { type: "text", text: "inspect attachments", text_elements: [] },
+      { type: "localImage", path: "/tmp/photo" },
+    ]);
+  });
 });
