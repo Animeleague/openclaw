@@ -1,16 +1,17 @@
 /**
- * Preserve a stable Codex dynamic-tool schema across image and text turns.
- *
- * Native vision makes the image tool redundant for the current attachment, but
- * removing it only on image-bearing turns changes the registered tool schema and
- * can force an otherwise reusable native thread to rotate.
+ * Filters Codex dynamic tools for turns that already contain image inputs so
+ * models with native vision do not get redundant image-inspection tools.
  */
+/** Removes the image tool when the model can directly consume inbound images. */
 export function filterToolsForVisionInputs<T extends { name?: string }>(
   tools: T[],
-  _params: {
+  params: {
     modelHasVision: boolean;
     hasInboundImages: boolean;
   },
 ): T[] {
-  return tools;
+  if (!params.modelHasVision || !params.hasInboundImages) {
+    return tools;
+  }
+  return tools.filter((tool) => tool.name !== "image");
 }
