@@ -105,6 +105,7 @@ export async function prepareCodexAttemptTurnRequest(
       cwd: resourceState.codexExecutionCwd,
       appServer: turnAppServer,
       promptText: turnState.codexTurnPromptText,
+      openClawRuntimeContext: context.openClawPromptContext,
       sandboxPolicy: resourceState.codexSandboxPolicy,
       environmentSelection: resourceState.codexEnvironmentSelection,
       clearInheritedServiceTier: resourceState.thread.clearInheritedServiceTier,
