@@ -17,6 +17,11 @@ import {
   resolveCodexAppServerRequestModelSelection,
   resolveReasoningEffort,
 } from "./thread-model-selection.js";
+import {
+  buildCodexUntrustedAdditionalContextChunks,
+  detachCodexRuntimeContext,
+  mergeCodexAdditionalContext,
+} from "./turn-additional-context.js";
 import { buildCodexUserInput } from "./user-input.js";
 
 const CODEX_CURRENT_SENDER_FIELD_MAX_CHARS = 256;
@@ -57,6 +62,7 @@ export function buildTurnStartParams(
     cwd: string;
     appServer: CodexAppServerRuntimeOptions;
     promptText?: string;
+    openClawRuntimeContext?: string;
     sandboxPolicy?: CodexSandboxPolicy;
     environmentSelection?: CodexTurnEnvironmentParams[];
     model?: string | null;
@@ -79,15 +85,24 @@ export function buildTurnStartParams(
         config: params.config,
       });
   const useThreadPermissionProfile = options.appServer.networkProxy && !options.sandboxPolicy;
+  const detachedRuntimeContext = detachCodexRuntimeContext({
+    promptText: options.promptText ?? params.prompt,
+    runtimeContext: options.openClawRuntimeContext,
+  });
   const currentSenderContext =
     params.trigger === "user" ? buildCodexCurrentSenderContextValue(params) : undefined;
-  // Untrusted context exposes authenticated attribution without promoting human-controlled labels.
-  const additionalContext: CodexTurnStartParams["additionalContext"] = currentSenderContext
-    ? { openclaw_current_sender: { kind: "untrusted", value: currentSenderContext } }
-    : undefined;
+  const additionalContext = mergeCodexAdditionalContext(
+    buildCodexUntrustedAdditionalContextChunks({
+      keyPrefix: "openclaw_runtime_context",
+      value: detachedRuntimeContext.runtimeContext,
+    }),
+    currentSenderContext
+      ? { openclaw_current_sender: { kind: "untrusted", value: currentSenderContext } }
+      : undefined,
+  );
   return {
     threadId: options.threadId,
-    input: buildCodexUserInput(options.promptText ?? params.prompt, params.images),
+    input: buildCodexUserInput(detachedRuntimeContext.promptText, params.images),
     ...(additionalContext ? { additionalContext } : {}),
     cwd: options.cwd,
     approvalPolicy: options.appServer.approvalPolicy,
