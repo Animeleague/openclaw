@@ -144,6 +144,7 @@ if ($Mode -eq "Rollback") {
     exit 0
 }
 
+# APPLY
 if ($V1Count -lt 1) {
     throw "$V1Marker is not present. Install Context History V1 first."
 }
