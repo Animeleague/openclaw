@@ -1,0 +1,11 @@
+diff --git a/extensions/codex/src/app-server/dynamic-tools.ts b/extensions/codex/src/app-server/dynamic-tools.ts
+--- a/extensions/codex/src/app-server/dynamic-tools.ts
++++ b/extensions/codex/src/app-server/dynamic-tools.ts
+@@ -409,5 +409,8 @@ const ALWAYS_DIRECT_DYNAMIC_TOOL_NAMES = new Set([
+   "agents_list",
++  "message",
+   "sessions_spawn",
+   "sessions_yield",
++  "web_fetch",
++  "web_search",
+ ]);
