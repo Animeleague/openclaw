@@ -4,6 +4,8 @@ import { isSystemAgentOnlyCodexDynamicToolAllowlist } from "./dynamic-tool-profi
 import type { CodexDynamicToolCallParams, CodexDynamicToolCallResponse } from "./protocol.js";
 import { sanitizeCodexToolResponse } from "./tool-progress-normalization.js";
 
+const CODEX_HOT_DIRECT_TOOL_NAMES = ["message", "web_fetch", "web_search"] as const;
+
 export function toTranscriptToolResult(
   response: CodexDynamicToolCallResponse,
 ): Record<string, unknown> {
@@ -76,16 +78,13 @@ export function resolveCodexDynamicToolDirectNames(
   params: EmbeddedRunAttemptParams,
   hostSystemAgentActive = false,
 ): string[] {
-  // Tools with catalogMode=direct-only use the model-only namespace. This list
-  // remains for control tools that intentionally live at the dynamic-tool root.
-  const names: string[] = [];
+  // Keep the small routine hot path directly callable so normal messaging and
+  // web lookups do not depend on Codex tool_search. Broader tools remain deferred.
+  const names = new Set<string>(CODEX_HOT_DIRECT_TOOL_NAMES);
   // OpenClaw is the run's only tool and must stay callable when Codex tool
   // search is unavailable. Exact toolsAllow is the public harness contract.
   if (hostSystemAgentActive && isSystemAgentOnlyCodexDynamicToolAllowlist(params.toolsAllow)) {
-    names.push("openclaw");
+    names.add("openclaw");
   }
-  if (params.sourceReplyDeliveryMode === "message_tool_only") {
-    names.push("message");
-  }
-  return names;
+  return [...names];
 }
