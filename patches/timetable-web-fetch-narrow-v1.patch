@@ -1,0 +1,60 @@
+diff --git a/src/agents/tools/web-fetch.ts b/src/agents/tools/web-fetch.ts
+--- a/src/agents/tools/web-fetch.ts
++++ b/src/agents/tools/web-fetch.ts
+@@ -835,9 +835,53 @@ async function runWebFetch(params: WebFetchRuntimeParams): Promise<Record<string, unknown>> {
+           config: params.config,
+         });
+         if (readable?.text) {
+-          text = readable.text;
+-          title = readable.title;
+-          extractor = readable.extractor;
++          let timetableHandled = false;
++          try {
++            const timetableUrl = new URL(finalUrl);
++            const hostnameParts = timetableUrl.hostname.toLowerCase().split(".");
++            const isAnimeLeagueTimetable =
++              hostnameParts.length === 3 &&
++              ["spring", "summer", "autumn", "winter"].includes(hostnameParts[0] ?? "") &&
++              (hostnameParts[1] ?? "").endsWith("animecon") &&
++              hostnameParts[2] === "com" &&
++              (timetableUrl.pathname === "/timetable" ||
++                timetableUrl.pathname === "/timetable/");
++            const isMobileAppTimetableStub =
++              isAnimeLeagueTimetable &&
++              readable.text
++                .toLowerCase()
++                .includes("download the anime league mobile app to view the timetable");
++            if (isMobileAppTimetableStub) {
++              const desktopOpen = body.match(
++                /<main\b[^>]*class=["'][^"']*\bhidden\b[^"']*\bmd:block\b[^"']*["'][^>]*>/i,
++              );
++              const desktopStart = desktopOpen?.index ?? -1;
++              const desktopEnd =
++                desktopStart >= 0
++                  ? body.indexOf("</main>", desktopStart + (desktopOpen?.[0].length ?? 0))
++                  : -1;
++              if (desktopStart >= 0 && desktopEnd >= 0) {
++                const desktopHtml = body
++                  .slice(desktopStart, desktopEnd + 7)
++                  .replace(/\bhidden\b\s*/i, "");
++                const timetable = await extractBasicHtmlContent({
++                  html: desktopHtml,
++                  extractMode: params.extractMode,
++                });
++                if (timetable?.text) {
++                  text = timetable.text;
++                  title = timetable.title ?? readable.title;
++                  extractor = "raw-html-timetable";
++                  timetableHandled = true;
++                }
++              }
++            }
++          } catch {}
++          if (!timetableHandled) {
++            text = readable.text;
++            title = readable.title;
++            extractor = readable.extractor;
++          }
+         } else {
+           let payload: Record<string, unknown> | null = null;
+           try {
