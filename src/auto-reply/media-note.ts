@@ -194,17 +194,44 @@ export function buildInboundMediaNoteProjection(ctx: MsgContext): InboundMediaNo
   }
 
   const count = visibleEntries.length;
+  let discoveredImageCount = 0;
+  const promptEntries = visibleEntries.flatMap((entry, index) => {
+    const normalizedType = normalizeLowercaseStringOrEmpty(entry.type);
+    const isImageEntry =
+      entry.fact.kind === "image" ||
+      normalizedType === "image" ||
+      normalizedType.startsWith("image/") ||
+      /\.(?:avif|bmp|gif|heic|heif|jpe?g|png|tiff?|webp)(?:$|[?#])/i.test(entry.path) ||
+      /\.(?:avif|bmp|gif|heic|heif|jpe?g|png|tiff?|webp)(?:$|[?#])/i.test(entry.url ?? "");
+
+    if (!isImageEntry) {
+      return [{ entry, index }];
+    }
+
+    discoveredImageCount += 1;
+    return discoveredImageCount <= 3 ? [{ entry, index }] : [];
+  });
+
+  const omittedImageCount = Math.max(0, discoveredImageCount - 3);
   const lines: string[] = [`[media attached: ${count} files]`];
-  for (const [idx, entry] of visibleEntries.entries()) {
+
+  for (const { entry, index } of promptEntries) {
     lines.push(
       formatMediaAttachedLine({
         path: entry.path,
-        index: idx + 1,
+        index: index + 1,
         total: count,
         type: entry.type,
         url: entry.url,
       }),
     );
   }
+
+  if (omittedImageCount > 0) {
+    lines.push(
+      `[${omittedImageCount} additional image${omittedImageCount === 1 ? "" : "s"} omitted from inspection]`,
+    ); // FORGE_MEDIA_PATH_IMAGE_CAP_3_V1
+  }
+
   return { text: lines.join("\n"), media };
 }
