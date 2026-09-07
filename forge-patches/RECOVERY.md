@@ -10,6 +10,7 @@ This file is for an AI rebuilding the Forge-specific OpenClaw runtime from a cle
 - Preserve the backup/manifest created by every patch.
 - Roll back in reverse installation order.
 - Do not put private Forge data in this public repository.
+- The live Forge runtime uses the **project-local `@openclaw/codex` bundle** under `~/.openclaw/npm/projects/...`, not a stale global Codex bundle. Patches that target Codex turn assembly must prove they are modifying the executable project-local runtime.
 
 ## Canonical installation order
 
@@ -38,37 +39,29 @@ This file is for an AI rebuilding the Forge-specific OpenClaw runtime from a cle
    - final marker: `FORGE_CODEX_IMAGE_STABILITY_V1_1`
    - deduplicates legacy media aliases and keeps the image-tool schema stable on image-bearing turns.
 
-7. `Patch-ForgeCodexContextHistoryV1.ps1`
-   - marker: `FORGE_CONTEXT_HISTORY_V1`
-   - moves duplicated historical `<conversation_context>` out of durable user text and into chunked untrusted `additionalContext`.
+7. `forge-patches/transient-runtime-context/Patch-ForgeCodexTransientRuntimeContextV4.ps1`
+   - final marker: `FORGE_CODEX_TRANSIENT_RUNTIME_CONTEXT_V4`
+   - **live-proven 2026-09-07** on the real OpenAuth / Codex app-server runtime.
+   - for Discord turns, keeps the current Forge/OpenClaw runtime prefix (PERSISTENT + TRANSITORY memory, monitor/history support context and other turn scaffolding) model-visible through the existing turn-scoped developer-instructions channel.
+   - persists only the final `[meta ...]` block plus actual Discord message as native user history.
+   - prevents the previously observed roughly +3.1k to +3.3k token context staircase per tiny Discord turn.
+   - resolves the executable project-local `@openclaw/codex` run bundle and refuses V3 `additionalContext` remnants.
+   - **supersedes Context History V1/V2 and Monitor Transient Context V1.2/V1.3 for this runtime. Do not install those older carriers before or after V4.**
 
-8. `forge-patches/context-history/Patch-ForgeCodexContextHistoryV2.ps1`
-   - final marker: `FORGE_CONTEXT_HISTORY_V2`
-   - install immediately after V1.
-   - V2 keeps the V1 carrier intact and changes only the guard so the carrier runs whenever `promptContextRange` exists, including with an external context engine.
+8. `Patch-ForgeCurrentTurnImageDedupeV1_1.ps1`
+   - final marker: `FORGE_CURRENT_TURN_IMAGE_DEDUPE_V1`
+   - requires Image Stability V1.1 and removes exact duplicate image payloads at the final current-turn image merge.
 
-9. `Patch-ForgeMonitorTransientContextV1_2-FAST.ps1`
-   - marker: `FORGE_MONITOR_TRANSIENT_CONTEXT_V1`
-   - keeps monitor review scaffolding model-visible for the current inference without persisting it as ordinary durable user-history text.
+9. `forge-patches/discord-inbound-compact/Patch-ForgeDiscordInboundCompactV1-FINAL.ps1`
+   followed by `Patch-ForgeDiscordInboundCompactV2-CORRECTED.ps1`.
+   - final marker: `FORGE_DISCORD_INBOUND_COMPACT_V2`
+   - run each dry check first; V2 is an incremental upgrade of the proven V1 runtime.
 
-10. `Patch-ForgeMonitorTransientContextV1_3.ps1`
-    - incremental upgrade of step 9.
-    - final matcher prefix is `[Forge Discord Monitor`.
-
-11. `Patch-ForgeCurrentTurnImageDedupeV1_1.ps1`
-    - final marker: `FORGE_CURRENT_TURN_IMAGE_DEDUPE_V1`
-    - requires Image Stability V1.1 and removes exact duplicate image payloads at the final current-turn image merge.
-
-12. `forge-patches/discord-inbound-compact/Patch-ForgeDiscordInboundCompactV1-FINAL.ps1`
-    followed by `Patch-ForgeDiscordInboundCompactV2-CORRECTED.ps1`.
-    - final marker: `FORGE_DISCORD_INBOUND_COMPACT_V2`
-    - run each dry check first; V2 is an incremental upgrade of the proven V1 runtime.
-
-13. `Patch-ForgeBootstrapToolEfficiencyV2-REMENTION.ps1`
+10. `Patch-ForgeBootstrapToolEfficiencyV2-REMENTION.ps1`
     - dry check first, then apply if ready.
     - after application refresh Forge's backend prompt with `/reset soft`.
 
-14. `forge-patches/kb-retrieval-efficiency/Patch-ForgeKBRetrievalEfficiencyV1.ps1`
+11. `forge-patches/kb-retrieval-efficiency/Patch-ForgeKBRetrievalEfficiencyV1.ps1`
     - workspace-policy edit only; never commit the real live `AGENTS.md` here.
 
 Restart the gateway at the restart points printed by the scripts. A future recovery AI may batch restarts only after proving that doing so does not invalidate an installer's expected baseline; otherwise follow each script literally.
@@ -77,9 +70,15 @@ Restart the gateway at the restart points printed by the scripts. A future recov
 
 - 8k native auto-compaction headroom proof (`FORGE_CODEX_NATIVE_AUTOCOMPACT_HEADROOM_V1`).
 - 200k auto-compaction proof/config (`FORGE_CODEX_AUTOCOMPACT_200K_PROOF_V1`).
-- `transient-runtime-context` experiments.
+- transient-runtime-context V1/V2/V3 experiments.
+- **Context History V1/V2 `additionalContext` carrier** (`FORGE_CONTEXT_HISTORY_V1` / `FORGE_CONTEXT_HISTORY_V2`) — superseded by V4 for the 2026.7.1 Forge runtime.
+- **Monitor Transient Context V1.2/V1.3 `additionalContext` carrier** (`FORGE_MONITOR_TRANSIENT_CONTEXT_V1`) — superseded by V4 for the 2026.7.1 Forge runtime.
 - Dual Warm Threads V2 (superseded by V2.1).
-- older image, bootstrap, Context History or Monitor Transient Context revisions except where the sequence above explicitly requires an earlier revision as a verified baseline.
+- older image, bootstrap or transient-context revisions except where the sequence above explicitly requires an earlier revision as a verified baseline.
+
+### Why the old additionalContext carriers are excluded
+
+Live testing on 2026-09-07 proved that this local Codex version persists `additionalContext` fragments as ordinary native `role:"user"` records such as `<external_forge_runtime_context_0000>...`. That moves the staircase rather than removing it. V4 instead uses the already-existing turn-scoped developer-instructions path, which was proven to keep exactly one runtime/memory block active per turn without leaking it into durable Discord user history.
 
 ## Final verification
 
@@ -89,12 +88,20 @@ After installation, rerun every individual patch status command. Then verify the
 - `FORGE_CODEX_DUAL_WARM_THREADS_V2_1`
 - `FORGE_CODEX_DURABLE_REGISTRATION_PROOF_V1`
 - `FORGE_CODEX_IMAGE_STABILITY_V1_1`
-- `FORGE_CONTEXT_HISTORY_V2`
-- `FORGE_MONITOR_TRANSIENT_CONTEXT_V1`
+- `FORGE_CODEX_TRANSIENT_RUNTIME_CONTEXT_V4`
 - `FORGE_CURRENT_TURN_IMAGE_DEDUPE_V1`
 - `FORGE_DISCORD_INBOUND_COMPACT_V2`
 
-Functional smoke tests must cover Sol → Luna → Luna → Sol continuity, owner → non-owner permissions/cache stability, single/multiple images, a long history turn, a monitor-summoned turn, and ordinary Discord guild/DM metadata. If expected behaviour differs, stop rather than stacking another workaround.
+Functional smoke tests must cover Sol → Luna → Luna → Sol continuity, owner → non-owner permissions/cache stability, single/multiple images, a long history turn, a monitor-summoned turn, and ordinary Discord guild/DM metadata.
+
+For V4 specifically, inspect native Codex rollout records after at least 6 small Discord turns and prove all of the following:
+
+1. Durable Discord `role:"user"` records contain only `[meta ...]` plus the actual user message, with zero `# Forge Memory Context`, `PERSISTENT_MEMORY`, `TRANSITORY_MEMORY`, `<forge_current_turn_context>` or `<external_forge_runtime_context_...>` leakage.
+2. Each current turn's collaboration/developer instructions contain exactly one `## Forge Current-Turn Runtime Context` block and exactly one `# Forge Memory Context` block.
+3. Tiny-turn input usage no longer grows by thousands of tokens per turn. The 2026-09-07 live proof showed post-warm natural growth around +100 to +130 tokens per small Discord exchange instead of roughly +3.1k to +3.3k.
+4. Warm cache reuse remains healthy; the live proof reached roughly 95–97% cached input on consecutive Luna turns.
+
+If expected behaviour differs, stop rather than stacking another workaround.
 
 ## Separate Forge plugin
 
