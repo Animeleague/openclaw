@@ -72,6 +72,7 @@ export async function resolveAgentTurnAttachments(params: {
     ? resolveRecentInboundHistoryImages({
         ctx: params.ctx,
         isImageAttachment: runtime.isImageAttachment,
+        limit: 3, // FORGE_RECENT_HISTORY_IMAGE_CAP_3_V1
       })
     : [];
   const firstHistoryAttachmentIndex =
@@ -144,7 +145,10 @@ export async function resolveAgentTurnAttachments(params: {
   let currentImageResolved = false;
   const hasCurrentMedia = currentAttachments.length > 0;
   const hasCurrentImageCandidate = currentAttachments.some(runtime.isImageAttachment);
-  for (const attachment of currentAttachments) {
+  const currentImageAttachments = currentAttachments
+    .filter((attachment) => runtime.isImageAttachment(attachment))
+    .slice(0, 3); // FORGE_CURRENT_IMAGE_CAP_3_V1
+  for (const attachment of currentImageAttachments) {
     currentImageResolved = (await resolveImageAttachment(attachment)) || currentImageResolved;
   }
   if (
