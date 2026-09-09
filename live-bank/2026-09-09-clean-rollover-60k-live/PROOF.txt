@@ -1,0 +1,30 @@
+﻿FORGE CLEAN NATIVE ROLLOVER - 60K PRODUCTION STATE
+Banked: 2026-09-09
+
+Production hardcap:
+60,000 native tokens
+
+Mechanism proven at 45k:
+- Old rollout: 47,724 input tokens
+- Clean fresh rollout: 14,177 input tokens
+- Subsequent fresh baseline: 14,451 input tokens
+- Warm cache recovered to 98%+
+
+Production configuration:
+- Same proven V4 clean-rollover mechanism
+- Threshold changed only from 45,000 to 60,000
+- Normal Forge reply verified after restart
+- V4 normal-message fix preserved
+- No-fork warm-cache behaviour preserved
+- Full durable-history replay suppressed on rollover
+
+Mechanism:
+1. Completed native turn checks real Codex rollout token count.
+2. At >=60,000 tokens, intentional rollover is armed.
+3. historyCoveredThrough records the completed-history cutoff.
+4. thread_bootstrap prevents full durable transcript replay.
+5. Old native binding retires on next startup.
+6. Fresh native thread starts from compact baseline.
+
+Live runtime SHA256:
+7AFD26EBF5FC8A4BA7058B33C0998794A54EBD637D9285DEE629FC2DDDEC75E2
