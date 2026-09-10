@@ -5,6 +5,7 @@ import {
   readStringArrayParam,
   readStringParam,
 } from "../runtime-api.js";
+import { compactDiscordLookupPayload } from "./runtime.messaging.lookup-result.js";
 import { discordMessagingActionRuntime } from "./runtime.messaging.runtime.js";
 import type { DiscordMessagingActionContext } from "./runtime.messaging.shared.js";
 
@@ -87,13 +88,15 @@ export async function handleDiscordMessageManagementAction(ctx: DiscordMessaging
         messageId,
         ctx.withOpts(),
       );
-      return jsonResult({
-        ok: true,
-        message: ctx.normalizeMessage(message),
-        guildId,
-        channelId,
-        messageId,
-      });
+      return jsonResult(
+        compactDiscordLookupPayload({
+          ok: true,
+          message: ctx.normalizeMessage(message),
+          guildId,
+          channelId,
+          messageId,
+        }),
+      );
     }
     case "readMessages": {
       if (!ctx.isActionEnabled("messages")) {
@@ -110,11 +113,13 @@ export async function handleDiscordMessageManagementAction(ctx: DiscordMessaging
       const messages = assertDiscordMessageListResult(
         await discordMessagingActionRuntime.readMessagesDiscord(channelId, query, ctx.withOpts()),
       );
-      return jsonResult({
-        ok: true,
-        channelId,
-        messages: messages.map((message) => ctx.normalizeMessage(message)),
-      });
+      return jsonResult(
+        compactDiscordLookupPayload({
+          ok: true,
+          channelId,
+          messages: messages.map((message) => ctx.normalizeMessage(message)),
+        }),
+      );
     }
     case "editMessage": {
       if (!ctx.isActionEnabled("messages")) {
@@ -183,7 +188,12 @@ export async function handleDiscordMessageManagementAction(ctx: DiscordMessaging
       const channelId = ctx.resolveChannelId();
       await ctx.assertReadTargetAllowed({ channelId });
       const pins = await discordMessagingActionRuntime.listPinsDiscord(channelId, ctx.withOpts());
-      return jsonResult({ ok: true, pins: pins.map((pin) => ctx.normalizeMessage(pin)) });
+      return jsonResult(
+        compactDiscordLookupPayload({
+          ok: true,
+          pins: pins.map((pin) => ctx.normalizeMessage(pin)),
+        }),
+      );
     }
     case "searchMessages": {
       if (!ctx.isActionEnabled("search")) {
@@ -261,13 +271,15 @@ export async function handleDiscordMessageManagementAction(ctx: DiscordMessaging
             Array.isArray(group) ? group.map((msg) => ctx.normalizeMessage(msg)) : group,
           )
         : messages;
-      return jsonResult({
-        ok: true,
-        results: {
-          ...results,
-          messages: normalizedMessages,
-        },
-      });
+      return jsonResult(
+        compactDiscordLookupPayload({
+          ok: true,
+          results: {
+            ...results,
+            messages: normalizedMessages,
+          },
+        }),
+      );
     }
     default:
       return undefined;
