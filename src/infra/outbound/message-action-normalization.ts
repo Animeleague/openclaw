@@ -58,10 +58,9 @@ export function normalizeMessageActionInput(params: {
   const hasLegacyTarget =
     (normalizeOptionalString(normalizedArgs.to) ?? "").length > 0 ||
     (normalizeOptionalString(normalizedArgs.channelId) ?? "").length > 0;
-  const legacyTarget =
-    normalizeOptionalString(normalizedArgs.to) ??
-    normalizeOptionalString(normalizedArgs.channelId) ??
-    "";
+  const legacyTo = normalizeOptionalString(normalizedArgs.to) ?? "";
+  const legacyChannelId = normalizeOptionalString(normalizedArgs.channelId) ?? "";
+  const legacyTarget = legacyTo || legacyChannelId;
   const deliveryAliasTarget = resolveActionDeliveryTargetAlias(action, normalizedArgs, {
     channel: inferredChannel,
     aliasSpec: params.targetAliasSpec,
@@ -104,7 +103,15 @@ export function normalizeMessageActionInput(params: {
 
   if (!explicitTarget && actionRequiresTarget(action) && hasLegacyTarget) {
     if (legacyTarget) {
-      normalizedArgs.target = legacyTarget;
+      // `channelId` explicitly asserts channel semantics. Preserve that assertion
+      // when Discord actions normalize through the generic `to` target shape.
+      normalizedArgs.target =
+        !legacyTo &&
+        legacyChannelId &&
+        inferredChannel === "discord" &&
+        /^\d+$/.test(legacyChannelId)
+          ? `channel:${legacyChannelId}`
+          : legacyTarget;
       delete normalizedArgs.to;
       delete normalizedArgs.channelId;
     }
