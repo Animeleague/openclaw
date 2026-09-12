@@ -1,0 +1,166 @@
+FORGE CODEX SOL/LUNA CONTINUITY + 120K LIVE BANK
+Banked: 2026-09-12
+Repository: Animeleague/openclaw
+Branch: bank/2026-09-12-sol-luna-continuity-120k-live
+Predecessor: bank/2026-09-09-clean-rollover-60k-live
+
+STATUS: LIVE-PROVEN
+
+Execution path:
+- OpenAuth / Codex app-server path
+- Active project Codex runtime
+- Sol/Terra principal durable binding
+- Luna isolated sidecar/transient binding
+
+ROOT CAUSE FIXED
+================
+
+Observed regression:
+Monitor Warm Rollback V1.04 FINAL5 ran after Dual Warm Threads V2.1 and explicitly reset:
+- forgeLunaSidecarActiveV2 = false
+- forgeTransientLunaModelSwitchV1 = false
+
+That allowed a Luna turn to patch/relabel the live Sol binding as gpt-5.6-luna.
+The next Sol turn then entered the native GPT-5.6 version-mismatch branch and destructively cleared the binding.
+
+Smoking-gun pre-fix trace:
+- Luna request patched thread 01a0966d-f78c-7a12-b9d1-7ced26607845 while beforeModel=gpt-5.6-sol
+- next Sol request saw the SAME thread as beforeModel=gpt-5.6-luna
+- Sol cleared it with operation "rotating a GPT-5.6 multi-agent thread binding"
+
+LIVE FIX MARKERS
+================
+
+FORGE_CODEX_MONITOR_DUAL_WARM_INTERLOCK_V1
+- Monitor rollback no longer overrides Dual Warm model isolation.
+- If Sol -> Luna has already selected Luna sidecar isolation, Monitor Warm preserves that decision.
+
+FORGE_CODEX_LUNA_NEVER_DURABLE_V1
+- A fresh Luna turn with no principal durable binding is sidecar/transient.
+- Luna cannot claim the durable principal slot after gateway restart.
+- Returning Sol therefore never needs to destroy a Luna-owned principal binding.
+
+Existing required markers retained:
+- FORGE_CODEX_TRANSIENT_LUNA_V1
+- FORGE_CODEX_DUAL_WARM_THREADS_V2_1
+- FORGE_CODEX_DURABLE_REGISTRATION_PROOF_V1
+- FORGE_CODEX_NATIVE_ROLLOVER_BOOTSTRAP_V4
+- FORGE_CODEX_NATIVE_POSTTURN_HARDCAP_NATIVE_V3
+
+LIVE VALIDATION
+===============
+
+Post-fix principal Sol thread:
+01a09787-d014-7393-afe3-c90eb8763240
+
+Validated flow:
+Sol A -> Luna -> Sol A -> Luna -> Sol A
+
+Post-clean-binding result:
+PASS - ZERO destructive GPT-5.6 model rotations.
+
+Observed Sol principal resumes:
+- 21:32 UTC: same Sol thread, normal patch
+- 21:36 UTC: same Sol thread, normal patch
+- later Sol turns continued on same thread
+
+Room-switch continuity also survived:
+general-chat -> private DM -> general-chat
+without a tool lookup.
+
+ROUTING VALIDATION
+==================
+
+Recent rollout model proof:
+- 01a09787-d014-7393-afe3-c90eb8763240 = gpt-5.6-sol
+- 01a09788-6eb0-7bb1-a3ad-1ff350f0cbfa = gpt-5.6-luna
+- 01a09797-63b3-7381-90df-68eb2083cf47 = gpt-5.6-luna
+
+Therefore the fix does NOT collapse all traffic onto Sol.
+Luna routing remains active.
+
+STAIRCASE / CACHE SANITY
+========================
+
+Per-turn Codex last_token_usage, not cumulative total_token_usage.
+
+Sol principal:
+Input   Delta   Cached  Cache
+67258   -
+67352   +94     67072   99.6%
+67490   +138
+67621   +131    67328   99.6%
+67766   +145    67456   99.5%
+67903   +137    67584   99.5%
+68167   +264    67712   99.3%
+68491   +324    67968   99.2%
+68606   +115    68352   99.6%
+68734   +128    68480   99.6%
+
+Luna sidecar:
+12946
+13062   +116    12032   92.1%
+13250   +188    12032   90.8%
+13483   +233
+
+New Luna transient thread:
+12967
+13218   +251    12032   91.0%
+13427   +209    13056   97.2%
+13658   +231    13056   95.6%
+13804   +146    13056   94.6%
+14002   +198    13056   93.2%
+14129   +127    13056   92.4%
+14236   +107    13056   91.7%
+14410   +174    14080   97.7%
+14722   +312    14080   95.6%
+14859   +137    14080   94.8%
+
+Conclusion:
+- old fixed ~+3k/message staircase NOT present
+- normal Sol growth roughly low hundreds of tokens/turn
+- warm Sol cache ~99%
+- warm Luna cache generally ~91-98%
+
+ROLLOVER POLICY
+===============
+
+Production completed-turn hardcap is TEMPORARILY 120,000 native tokens.
+
+Current strings:
+forgePostTurnNativeTokensV3 >= 120_000
+"forge native thread reached completed-turn 120k hardcap; fresh rollover armed"
+hardcap: 120_000
+
+Reason:
+The 60k clean rollover mechanism is valid, but a native rollover loses more immediate warm-thread conversational continuity than originally assumed. Until native tool-output/context optimisation is completed, 120k gives a wider continuity runway.
+
+This is a threshold change only. V4 clean rollover semantics remain:
+- historyCoveredThrough
+- thread_bootstrap
+- compact fresh baseline
+- full durable-history replay suppressed
+
+NORMAL ROTATION POLICY
+======================
+
+For a healthy principal conversation:
+- Sol/Luna model switching must NOT rotate the principal native thread.
+- Conversation age/size rotation is intentionally controlled by the completed-turn hardcap.
+- Exceptional safety rotations remain valid for incompatible runtime/config bindings, explicit reset, or unrecoverable native context errors.
+
+MEMORY NOTE
+===========
+
+Native Codex thread rotation does not erase the durable OpenClaw session evidence used by Daily memory maintenance. Daily memory consumes new conversation evidence since its checkpoint. The continuity loss discussed here is immediate warm native conversational continuity, not deletion of the durable session transcript.
+
+NEXT OPTIMISATION
+=================
+
+Keep 120k temporarily while working on:
+- transient native tool-result removal / rollback policy
+- tool-output size reduction
+- baseline prompt/context optimisation
+- routing-cost audit
+
+Do not reintroduce Monitor Warm logic that clears Dual Warm sidecar/transient flags.
