@@ -25,6 +25,7 @@ import type {
   CodexDynamicToolCallResponse,
 } from "./protocol.js";
 import type { CodexAttemptResources } from "./run-attempt-resources.js";
+import type { CodexTransientToolTransactionV4 } from "./transient-tool-transaction.js";
 import { createCodexDynamicToolExecutionRegistry } from "./run-attempt-tools.js";
 import { createCodexUserInputBridge } from "./user-input-bridge.js";
 
@@ -69,6 +70,8 @@ export function createCodexAttemptTurnState(resources: CodexAttemptResources) {
     unsettledFinalizationHookCount: 0,
     rejectedFinalizationHookAssistant: undefined as { itemId?: string } | undefined,
     turnCrossedToolHandoff: false,
+    transientToolTransactionV4: undefined as CodexTransientToolTransactionV4 | undefined,
+    transientToolTransactionV4Unavailable: false,
     pendingTerminalDynamicToolRelease: undefined as
       | {
           call: CodexDynamicToolCallParams;
