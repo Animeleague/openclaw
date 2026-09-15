@@ -33,6 +33,7 @@ import type { CodexAttemptTurnState } from "./run-attempt-turn-state.js";
 import { captureCodexSettledTurnFinalizationContext } from "./settled-turn-context.js";
 import { normalizeCodexTrajectoryError, recordCodexTrajectoryCompletion } from "./trajectory.js";
 import { codexTranscriptMirrorRuntime } from "./transcript-mirror.js";
+import { promoteCodexTransientToolTransactionV4 } from "./transient-tool-transaction.js";
 import {
   createCodexUsageLimitPromptError,
   isCodexUsageLimitPromptError,
@@ -400,13 +401,41 @@ export async function finalizeCodexAttempt(
     },
     hookRunner,
   });
+  const terminalAssistantText = collectTerminalAssistantText(result);
+  if (turnSucceeded && state.transientToolTransactionV4 && terminalAssistantText) {
+    try {
+      await promoteCodexTransientToolTransactionV4({
+        client: resourceState.client,
+        bindingStore,
+        bindingIdentity,
+        transaction: state.transientToolTransactionV4,
+        userText: params.prompt,
+        assistantText: terminalAssistantText,
+        timeoutMs: appServer.requestTimeoutMs,
+        signal: runAbortController.signal,
+      });
+    } catch (error) {
+      // Do not endanger a successful user turn for an optimisation failure.
+      // The unpromoted clean fork is cleaned later and the dirty source binding
+      // remains authoritative, allowing the banked rollback path to fall back.
+      embeddedAgentLog.warn("codex transient tools v4 clean-fork promotion failed", {
+        sourceThreadId: resourceState.thread.threadId,
+        turnId: activeTurnId,
+        error: formatErrorMessage(error),
+      });
+    }
+  }
+
   state.shouldDelayNativeHookRelayUnregister =
     completedTurnStatus === "completed" &&
     !effectiveTimedOut &&
     !runAbortController.signal.aborted &&
     !finalAborted &&
     !finalPromptError;
-  if (state.shouldDelayNativeHookRelayUnregister) {
+  if (
+    state.shouldDelayNativeHookRelayUnregister &&
+    state.transientToolTransactionV4?.promoted !== true
+  ) {
     try {
       await markCodexAppServerBindingCoveredThroughTurn({
         bindingStore,
@@ -451,7 +480,6 @@ export async function finalizeCodexAttempt(
     promptError: normalizeCodexTrajectoryError(finalPromptError),
   });
   markTrajectoryEndRecorded();
-  const terminalAssistantText = collectTerminalAssistantText(result);
   if (
     terminalAssistantText &&
     (!streamState.eventEmitted || streamState.needsTerminalSnapshot) &&
