@@ -1,4 +1,9 @@
+import {
+  embeddedAgentLog,
+  formatErrorMessage,
+} from "openclaw/plugin-sdk/agent-harness-runtime";
 import { onInternalDiagnosticEvent } from "openclaw/plugin-sdk/diagnostic-runtime";
+import { isIncognitoSessionKey } from "../incognito-session.js";
 import { handleCodexAppServerApprovalRequest } from "./approval-bridge.js";
 import { isCodexAppServerApprovalRequest } from "./client.js";
 import { shouldAutoApproveCodexAppServerApprovals } from "./config.js";
@@ -26,6 +31,7 @@ import type { CodexAttemptLifecycleController } from "./run-attempt-lifecycle-co
 import { emitCodexAppServerEvent } from "./run-attempt-lifecycle.js";
 import type { CodexAttemptResources } from "./run-attempt-resources.js";
 import { toTranscriptToolResult } from "./run-attempt-tools.js";
+import { prepareCodexTransientToolTransactionV4 } from "./transient-tool-transaction.js";
 import type { CodexAttemptTurnState } from "./run-attempt-turn-state.js";
 import {
   inferCodexDynamicToolMeta,
@@ -152,6 +158,32 @@ export function createCodexAttemptServerRequestController(
         markCurrentTurnRequestProgress();
         state.turnCrossedToolHandoff = true;
         return toCodexDynamicToolProtocolResponse(await replayedExecution) as JsonValue;
+      }
+      if (
+        !state.transientToolTransactionV4 &&
+        !state.transientToolTransactionV4Unavailable &&
+        resourceState.thread.connectionScope !== "supervision" &&
+        !isIncognitoSessionKey(params.sessionKey) &&
+        params.cleanupBundleMcpOnRunEnd !== true
+      ) {
+        try {
+          state.transientToolTransactionV4 = await prepareCodexTransientToolTransactionV4({
+            client: resourceState.client,
+            thread: resourceState.thread,
+            turnId,
+            timeoutMs: appServer.requestTimeoutMs,
+            signal: runAbortController.signal,
+          });
+        } catch (error) {
+          // Snapshot failure must never block the user's tool call. The currently
+          // banked rollback path remains the live fallback until V4 is proven.
+          state.transientToolTransactionV4Unavailable = true;
+          embeddedAgentLog.warn("codex transient tools v4 could not prepare clean fork", {
+            threadId: resourceState.thread.threadId,
+            turnId,
+            error: formatErrorMessage(error),
+          });
+        }
       }
       const toolCallOrdinal = allocateCodexToolOutcomeOrdinal?.(call.callId);
       armCompletionWatchOnResponse = true;
