@@ -13,6 +13,7 @@ import type { CodexAttemptActiveTurn } from "./run-attempt-active-turn.js";
 import type { CodexAttemptLifecycleController } from "./run-attempt-lifecycle-controller.js";
 import type { CodexAttemptResources } from "./run-attempt-resources.js";
 import type { prepareCodexAttemptTurnRequest } from "./run-attempt-turn-request.js";
+import { abandonCodexTransientToolTransactionV4 } from "./transient-tool-transaction.js";
 import type { CodexAttemptTurnState } from "./run-attempt-turn-state.js";
 
 export async function cleanupCodexAttempt(
@@ -32,8 +33,15 @@ export async function cleanupCodexAttempt(
     runCleanupStep,
   } = resources;
   const { connection } = prompt.context.runtime;
-  const { params, options, runAbortController, terminalState, bindingStore, bindingIdentity } =
-    connection;
+  const {
+    params,
+    options,
+    runAbortController,
+    terminalState,
+    bindingStore,
+    bindingIdentity,
+    appServer,
+  } = connection;
   const { state, steeringQueueRef, userInputBridgeRef, turnWatches } = turnRuntime;
   const {
     maybeEmitFastModeAutoResetBestEffort,
@@ -140,6 +148,13 @@ export async function cleanupCodexAttempt(
       }
     }
   } finally {
+    await runCleanupStep("codex-transient-tools-v4-clean-fork", () =>
+      abandonCodexTransientToolTransactionV4({
+        client: resourceState.client,
+        transaction: state.transientToolTransactionV4,
+        timeoutMs: appServer.requestTimeoutMs,
+      }),
+    );
     await runCleanupStep("codex-user-input-cancel", () =>
       userInputBridgeRef.current?.cancelPending(),
     );
