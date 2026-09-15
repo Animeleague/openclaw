@@ -1,0 +1,152 @@
+FORGE STAGE 2 SOL -> LUNA NATIVE DELTA LIVE BANK
+Banked: 2026-09-15
+Repository: Animeleague/openclaw
+Branch: bank/2026-09-15-stage2-luna-native-delta-live
+Predecessor: bank/2026-09-12-sol-luna-continuity-120k-live
+
+MATCHING MONITOR BANK
+=====================
+
+Repository: Animeleague/forge-discord-gateway
+Branch: bank/2026-09-15-stage2-luna-native-delta-live
+Tag: bank-2026-09-15-stage2-luna-native-delta-live
+Commit: 70cc448
+
+STATUS: LIVE-PROVEN
+
+GOAL
+====
+
+Preserve dual-warm native Codex threads while giving Luna genuine native chronology for completed public Sol turns missed since Luna last participated.
+
+NO rollback.
+NO fork-per-turn.
+NO fresh Luna thread on ordinary model switches.
+NO replay of the entire previous-30 each turn.
+NO DM/private/staff-only native injection.
+
+STAGE 2 MARKERS
+===============
+
+Monitor:
+FORGE_CROSS_MODEL_NATIVE_DELTA_V1
+
+Codex:
+FORGE_CODEX_NATIVE_DELTA_V1
+
+Existing retained live markers:
+FORGE_CODEX_TRANSIENT_RUNTIME_CONTEXT_V4
+FORGE_CODEX_NATIVE_ROLLOVER_BOOTSTRAP_V4
+FORGE_CODEX_NATIVE_POSTTURN_HARDCAP_NATIVE_V3
+FORGE_CODEX_MONITOR_DUAL_WARM_INTERLOCK_V1
+FORGE_CODEX_LUNA_NEVER_DURABLE_V1
+
+STATIC VALIDATION
+=================
+
+Monitor tests after Stage 2 patch:
+tests 121
+pass 121
+fail 0
+
+Stage 2 unit coverage proved:
+- newest 30 public eligible Sol exchanges selected
+- all bounded pending IDs ACKed after successful sync
+- private/staff/DM sources excluded
+- legacy principal records lacking explicit eligibility excluded
+
+PACKAGE / LIVE SHAS
+===================
+
+Installed Stage 2 monitor package npm shasum:
+5f77929f9de685eaa4035b6604e89e38e5041311
+
+Protected Stage 1 Codex SHA256:
+0EB6C786C7C6AE91E4DBAB882364BC7AC7BEF01C72DC22E1FBB19452E641406C
+
+Stage 2 live Codex SHA256:
+3C2B2487D111680FC6DC53AEEBBE2BE3FA75FE11DAF08398C571769188169A3B
+
+Stage 2 pre-write backup:
+run-attempt-FUyOjGCV.js.pre-stage2-native-delta-v2-20260914-232029.bak
+
+GATEWAY RESTART PROOF
+=====================
+
+After restart:
+- Forge Discord Monitor status = loaded
+- imported = true
+- 12 runtime hooks registered
+- installed package shasum = 5f77929f...
+- live Codex bundle still contained:
+  FORGE_CODEX_TRANSIENT_RUNTIME_CONTEXT_V4
+  FORGE_CODEX_NATIVE_DELTA_V1
+  FORGE_CODEX_NATIVE_POSTTURN_HARDCAP_NATIVE_V3
+
+LIVE CANARY PROOF
+=================
+
+Public Sol message contained:
+Stage 2 continuity canary is 58310472
+
+Continuity ID:
+f289ee28-3cdc-443d-8bed-3e4c41df48c8
+
+Subsequent Luna rollout stored a native user response_item beginning:
+[Missed completed Discord exchange | ... continuity-id f289ee28-3cdc-443d-8bed-3e4c41df48c8]
+
+That native item contained the Sol canary.
+
+Luna final answer:
+58310472
+
+Tool-call rows in the Luna rollout:
+0
+
+Native injected copies of the exact continuity ID:
+1
+
+CONCLUSION:
+PASS - the missed public Sol exchange was delivered into Luna's real native conversation history.
+PASS - Luna did not need a Discord/search/tool lookup.
+PASS - the exact missed exchange was not injected twice.
+
+THREADS OBSERVED
+================
+
+Post-restart Luna:
+01a0a6d7-e71e-7113-99e4-15ef32a86d05
+
+Post-restart Sol:
+01a0a68c-4d3b-71d0-9838-6d6bee8dc2fc
+
+Older warm Luna before restart:
+01a09cfb-51b0-75a1-a485-b7ae1c4359da
+
+PRIVACY BOUNDARY
+================
+
+Native Luna delta requires explicit public eligibility in the monitor and independently requires:
+scope = public-discord
+visibility = public
+
+DM/private records never enter Luna native history.
+Always-Sol and excluded channels are not eligible.
+
+ROLLOVER
+========
+
+Completed-turn clean rollover remains 120,000 native tokens.
+
+Stage 2 does not modify V4 rollover semantics:
+- completed-turn native count
+- historyCoveredThrough
+- thread_bootstrap
+- compact fresh baseline
+- no full durable transcript replay
+
+NEXT
+====
+
+Bank continuity plumbing and move to session analysis / Forge capability work.
+Do not reintroduce per-turn thread/rollback.
