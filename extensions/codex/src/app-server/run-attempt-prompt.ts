@@ -98,8 +98,14 @@ export async function prepareCodexAttemptPrompt(context: CodexAttemptContext) {
     4_000,
     forgeFreshHistoryTokens * 4,
   );
+  const forgeFreshThreadIsLuna =
+    params.modelId.trim().toLowerCase().split("/").at(-1) === "gpt-5.6-luna";
 
   const applyFreshThreadContinuityProjection = () => {
+    // Luna rebuilds from the retained Sol native journal, not canon replay.
+    if (forgeFreshThreadIsLuna) {
+      return;
+    }
     const projection = projectContextEngineAssemblyForCodex({
       assembledMessages: historyState.messages,
       originalHistoryMessages: historyState.messages,
