@@ -197,6 +197,24 @@ if (!text.includes("FORGE_CODEX_ROLLOVER_CONFIG_V5")) {
   );
 }
 
+// Publish the actual current principal native thread ID into the same global
+// bridge used by Stage 2. The monitor persists this generation ID and trims its
+// retained Sol journal to the configured fresh-history tail only when Sol rolls.
+if (!text.includes("FORGE_NATIVE_DELTA_PRINCIPAL_THREAD_V2")) {
+  const bridgeAnchor =
+`const forgeNativeDeltaBridgeV1 = globalThis[Symbol.for("forge.codex-native-delta.v1")];`;
+  const bridgeReplacement =
+`const forgeNativeDeltaBridgeV1 = globalThis[Symbol.for("forge.codex-native-delta.v1")];
+// FORGE_NATIVE_DELTA_PRINCIPAL_THREAD_V2
+const forgeNativeDeltaRuntimeModelV2 =
+    (params.modelId ?? "").trim().toLowerCase().split("/").at(-1);
+if (forgeNativeDeltaRuntimeModelV2 !== "gpt-5.6-luna" &&
+    forgeNativeDeltaBridgeV1) {
+    forgeNativeDeltaBridgeV1.currentPrincipalThreadId = thread.threadId;
+}`;
+  replaceOnce(bridgeAnchor, bridgeReplacement, "principal native thread bridge");
+}
+
 // Stage 2 should not arbitrarily truncate Sol chronology at 30 exchanges.
 if (text.includes("forgeNativeDeltaRawV1.exchanges.length > 30")) {
   text = text.replace(
@@ -234,7 +252,8 @@ for (const marker of [
   "FORGE_CROSS_MODEL_NATIVE_DELTA_V1",
   "FORGE_CODEX_FRESH_THREAD_HISTORY_CAP_V1",
   "FORGE_CODEX_ROLLOVER_CONFIG_V5",
-  "FORGE_NATIVE_DELTA_WARM_THREAD_LEDGER_V2"
+  "FORGE_NATIVE_DELTA_WARM_THREAD_LEDGER_V2",
+  "FORGE_NATIVE_DELTA_PRINCIPAL_THREAD_V2"
 ]) {
   if (!text.includes(marker)) throw new Error("Required marker missing after patch: " + marker);
 }
