@@ -127,7 +127,11 @@ if (!text.includes("FORGE_CODEX_FRESH_THREAD_HISTORY_CAP_V1")) {
 \t\t\t? Math.floor(forgeFreshHistoryRawV5)
 \t\t\t: 20_000;
 \tconst forgeFreshHistoryMaxCharsV5 = Math.max(4_000, forgeFreshHistoryTokensV5 * 4);
+\tconst forgeFreshThreadIsLunaV5 =
+\t\t(params.modelId ?? "").trim().toLowerCase().split("/").at(-1) === "gpt-5.6-luna";
 \tconst applyFreshThreadContinuityProjection = () => {
+\t\t// Luna rebuilds from the retained Sol native journal, not canon replay.
+\t\tif (forgeFreshThreadIsLunaV5) return;
 \t\tconst projection = projectContextEngineAssemblyForCodex({
 \t\t\tassembledMessages: historyMessages,
 \t\t\toriginalHistoryMessages: historyMessages,
