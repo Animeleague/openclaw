@@ -73,12 +73,47 @@ export async function prepareCodexAttemptPrompt(context: CodexAttemptContext) {
     sandbox,
   } = connection;
   const { toolBridge } = attemptTools;
+  // FORGE_CODEX_FRESH_THREAD_HISTORY_CAP_V1
+  const forgeContinuityConfig = (
+    params.config as
+      | {
+          plugins?: {
+            entries?: Record<
+              string,
+              { config?: { continuity?: Record<string, unknown> } }
+            >;
+          };
+        }
+      | undefined
+  )?.plugins?.entries?.["forge-discord-monitor"]?.config?.continuity;
+  const configuredForgeFreshHistoryTokens =
+    forgeContinuityConfig?.solFreshHistoryTokens;
+  const forgeFreshHistoryTokens =
+    typeof configuredForgeFreshHistoryTokens === "number" &&
+    Number.isFinite(configuredForgeFreshHistoryTokens) &&
+    configuredForgeFreshHistoryTokens > 0
+      ? Math.floor(configuredForgeFreshHistoryTokens)
+      : 20_000;
+  const forgeFreshHistoryMaxChars = Math.max(
+    4_000,
+    forgeFreshHistoryTokens * 4,
+  );
+  const forgeFreshThreadIsLuna =
+    params.modelId.trim().toLowerCase().split("/").at(-1) === "gpt-5.6-luna";
+
   const applyFreshThreadContinuityProjection = () => {
+    // Luna rebuilds from the retained Sol native journal, not canon replay.
+    if (forgeFreshThreadIsLuna) {
+      return;
+    }
     const projection = projectContextEngineAssemblyForCodex({
       assembledMessages: historyState.messages,
       originalHistoryMessages: historyState.messages,
       prompt: params.prompt,
-      maxRenderedContextChars: codexContextProjectionMaxChars,
+      maxRenderedContextChars: Math.min(
+        codexContextProjectionMaxChars,
+        forgeFreshHistoryMaxChars,
+      ),
     });
     promptState.promptText = projection.promptText;
     promptState.promptContextRange = projection.promptContextRange;

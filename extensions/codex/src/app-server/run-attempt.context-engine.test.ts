@@ -958,6 +958,92 @@ describe("runCodexAppServerAttempt context-engine lifecycle", () => {
     await run;
   });
 
+  it("caps fresh Forge native-thread history using the configured recent-history budget", async () => {
+    const sessionFile = path.join(tempDir, "session.jsonl");
+    const workspaceDir = path.join(tempDir, "workspace");
+    const sessionManager = openFileBackedSessionManagerForTest(sessionFile, {
+      sessionId: "session-1",
+    });
+    sessionManager.appendMessage(
+      userMessage(`OLD_CONTEXT_START ${"x".repeat(5_000)}`, 10) as never,
+    );
+    sessionManager.appendMessage(
+      assistantMessage("NEW_CONTEXT_TAIL", 11) as never,
+    );
+
+    const harness = createStartedThreadHarness(async (method) => {
+      if (method === "thread/start") {
+        return threadStartResult("thread-fresh");
+      }
+      return undefined;
+    });
+    const params = createParams(sessionFile, workspaceDir);
+    params.config = {
+      ...params.config,
+      plugins: {
+        ...params.config?.plugins,
+        entries: {
+          ...params.config?.plugins?.entries,
+          "forge-discord-monitor": {
+            enabled: true,
+            config: {
+              continuity: {
+                solFreshHistoryTokens: 1_000,
+              },
+            },
+          },
+        },
+      },
+    };
+
+    const run = runCodexAppServerAttempt(params);
+    await harness.waitForMethod("turn/start");
+
+    const inputText = getRequestInputText(harness);
+    expect(inputText).toContain("OpenClaw assembled context for this turn:");
+    expect(inputText).toContain("[truncated ");
+    expect(inputText).not.toContain("OLD_CONTEXT_START");
+    expect(inputText).toContain("NEW_CONTEXT_TAIL");
+    expect(inputText).toContain("hello");
+
+    await harness.completeTurn("completed", "thread-fresh");
+    await run;
+  });
+
+  it("does not replay canonical history into a fresh Luna thread", async () => {
+    const sessionFile = path.join(tempDir, "session.jsonl");
+    const workspaceDir = path.join(tempDir, "workspace");
+    const sessionManager = openFileBackedSessionManagerForTest(sessionFile, {
+      sessionId: "session-1",
+    });
+    sessionManager.appendMessage(
+      userMessage("CANON_SHOULD_NOT_ENTER_LUNA", 10) as never,
+    );
+    sessionManager.appendMessage(
+      assistantMessage("OLD_CANON_REPLY", 11) as never,
+    );
+
+    const harness = createStartedThreadHarness(async (method) => {
+      if (method === "thread/start") {
+        return threadStartResult("thread-fresh-luna");
+      }
+      return undefined;
+    });
+    const params = createParams(sessionFile, workspaceDir);
+    params.modelId = "gpt-5.6-luna";
+
+    const run = runCodexAppServerAttempt(params);
+    await harness.waitForMethod("turn/start");
+
+    const inputText = getRequestInputText(harness);
+    expect(inputText).not.toContain("CANON_SHOULD_NOT_ENTER_LUNA");
+    expect(inputText).not.toContain("OLD_CANON_REPLY");
+    expect(inputText).toContain("hello");
+
+    await harness.completeTurn("completed", "thread-fresh-luna");
+    await run;
+  });
+
   it("starts a fresh Codex thread and reprojects when context-engine epoch changes", async () => {
     const info = vi.spyOn(embeddedAgentLog, "info").mockImplementation(() => undefined);
     const sessionFile = path.join(tempDir, "session.jsonl");
