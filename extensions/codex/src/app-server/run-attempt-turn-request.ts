@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { embeddedAgentLog, formatErrorMessage } from "openclaw/plugin-sdk/agent-harness-runtime";
 import {
   interruptCodexTurnAndWaitBestEffort,
@@ -19,6 +20,37 @@ import type { CodexAttemptResources } from "./run-attempt-resources.js";
 import type { CodexAttemptTurnState } from "./run-attempt-turn-state.js";
 import { buildTurnStartParams } from "./thread-lifecycle.js";
 import { buildCodexUserPromptMessage } from "./transcript-mirror.js";
+
+const FORGE_LIVE_ROOM_CONTEXT_BEGIN = "[FORGE_LIVE_CHANNEL_30_BEGIN]";
+const FORGE_LIVE_ROOM_CONTEXT_END = "[FORGE_LIVE_CHANNEL_30_END]";
+
+function inspectForgeFinalRoomContext(text: string) {
+  const startOffset = text.indexOf(FORGE_LIVE_ROOM_CONTEXT_BEGIN);
+  const endMarkerOffset =
+    startOffset >= 0 ? text.indexOf(FORGE_LIVE_ROOM_CONTEXT_END, startOffset) : -1;
+  if (startOffset < 0 || endMarkerOffset < 0) {
+    return {
+      present: false,
+      hasBeginMarker: startOffset >= 0,
+      hasEndMarker: endMarkerOffset >= 0,
+      startOffset,
+      endOffset: -1,
+      roomContextChars: 0,
+      roomContextHash: null as string | null,
+    };
+  }
+  const endOffset = endMarkerOffset + FORGE_LIVE_ROOM_CONTEXT_END.length;
+  const block = text.slice(startOffset, endOffset);
+  return {
+    present: true,
+    hasBeginMarker: true,
+    hasEndMarker: true,
+    startOffset,
+    endOffset,
+    roomContextChars: block.length,
+    roomContextHash: createHash("sha256").update(block).digest("hex").slice(0, 16),
+  };
+}
 
 export async function prepareCodexAttemptTurnRequest(
   resources: CodexAttemptResources,
@@ -115,6 +147,19 @@ export async function prepareCodexAttemptTurnRequest(
       skillsCollaborationInstructions: context.skillsCollaborationInstructions,
       memoryCollaborationInstructions: workspaceBootstrapContext.memoryCollaborationInstructions,
       preserveNativeTurnSettings: usesSupervisionConnection,
+    });
+    const finalTurnText = turnStartParams.input
+      .filter((item) => item.type === "text")
+      .map((item) => item.text)
+      .join("\n");
+    const forgeRoomContextDiagnostic = inspectForgeFinalRoomContext(finalTurnText);
+    embeddedAgentLog.info("forge final room context delivery diag v1", {
+      kind: "forge-final-room-context-diag-v1",
+      runId: params.runId,
+      threadId: resourceState.thread.threadId,
+      model: turnStartParams.model ?? params.modelId,
+      promptChars: finalTurnText.length,
+      ...forgeRoomContextDiagnostic,
     });
     codexModelCallDiagnostics.setRequestPayloadBytes(utf8JsonByteLength(turnStartParams));
     state.latestStartupErrorNotification = undefined;
