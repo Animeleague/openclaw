@@ -1761,7 +1761,7 @@ describe("Codex app-server turn input image sanitizing", () => {
     );
   });
 
-  it("places memory before skills and late transient context last", () => {
+  it("places memory before skills in turn-scoped developer instructions", () => {
     const request = buildTurnStartParams(createAttemptParams({ provider: "openai" }), {
       threadId: "thread-1",
       cwd: "/repo",
@@ -1769,7 +1769,6 @@ describe("Codex app-server turn input image sanitizing", () => {
       turnScopedDeveloperInstructions: "SOUL.md turn-only context",
       memoryCollaborationInstructions: "MEMORY.md pointer",
       skillsCollaborationInstructions: "<available_skills>",
-      lateTurnScopedDeveloperInstructions: "FORGE TRANSIENT TAIL",
     });
     const developerInstructions = request.collaborationMode?.settings.developer_instructions ?? "";
 
@@ -1779,10 +1778,6 @@ describe("Codex app-server turn input image sanitizing", () => {
     expect(developerInstructions.indexOf("MEMORY.md pointer")).toBeLessThan(
       developerInstructions.indexOf("<available_skills>"),
     );
-    expect(developerInstructions.indexOf("<available_skills>")).toBeLessThan(
-      developerInstructions.indexOf("FORGE TRANSIENT TAIL"),
-    );
-    expect(developerInstructions.endsWith("FORGE TRANSIENT TAIL")).toBe(true);
   });
 
   it("replaces malformed inline images before turn/start", () => {
