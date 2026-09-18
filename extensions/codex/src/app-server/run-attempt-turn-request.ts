@@ -8,7 +8,10 @@ import {
   utf8JsonByteLength,
 } from "./attempt-diagnostics.js";
 import { isCodexAppServerIndeterminateRequestCancellationError } from "./client.js";
-import { extractForgeTransientRuntimeContext } from "./forge-transient-runtime-context.js";
+import {
+  buildForgeTransientAdditionalContext,
+  extractForgeTransientRuntimeContext,
+} from "./forge-transient-runtime-context.js";
 import { assertCodexTurnStartResponse } from "./protocol-validators.js";
 import type { CodexTurnStartResponse } from "./protocol.js";
 import { readCodexRateLimitsRevision } from "./rate-limit-cache.js";
@@ -18,7 +21,6 @@ import {
 } from "./run-attempt-lifecycle.js";
 import type { CodexAttemptResources } from "./run-attempt-resources.js";
 import type { CodexAttemptTurnState } from "./run-attempt-turn-state.js";
-import { joinPresentSections } from "./run-attempt-state.js";
 import { buildTurnStartParams } from "./thread-lifecycle.js";
 import { buildCodexUserPromptMessage } from "./transcript-mirror.js";
 
@@ -50,21 +52,18 @@ export async function prepareCodexAttemptTurnRequest(
   });
   const nativeTurnPromptText =
     forgeTransientRuntimeCarrier?.promptText ?? turnState.codexTurnPromptText;
-  const buildNativeCodexDeveloperInstructions = () =>
-    joinPresentSections(
-      buildRenderedCodexDeveloperInstructions(),
-      forgeTransientRuntimeCarrier?.developerInstructions,
-    );
+  const forgeAdditionalContext = buildForgeTransientAdditionalContext(
+    forgeTransientRuntimeCarrier?.transientText,
+  );
+  const buildNativeCodexDeveloperInstructions = () => buildRenderedCodexDeveloperInstructions();
 
   if (forgeTransientRuntimeCarrier) {
-    embeddedAgentLog.info(
-      "forge transient runtime context routed through late turn-scoped developer instructions",
-      {
-        sessionId: params.sessionId,
-        transientChars: forgeTransientRuntimeCarrier.transientText.length,
-        durablePromptChars: forgeTransientRuntimeCarrier.promptText.length,
-      },
-    );
+    embeddedAgentLog.info("forge transient runtime context routed through turn/start additionalContext", {
+      sessionId: params.sessionId,
+      transientChars: forgeTransientRuntimeCarrier.transientText.length,
+      durablePromptChars: forgeTransientRuntimeCarrier.promptText.length,
+      additionalContextChunks: Object.keys(forgeAdditionalContext ?? {}).length,
+    });
   }
 
   const buildCodexModelInputMessages = () => [
@@ -139,25 +138,36 @@ export async function prepareCodexAttemptTurnRequest(
       turnScopedDeveloperInstructions: workspaceBootstrapContext.turnScopedDeveloperInstructions,
       skillsCollaborationInstructions: context.skillsCollaborationInstructions,
       memoryCollaborationInstructions: workspaceBootstrapContext.memoryCollaborationInstructions,
-      lateTurnScopedDeveloperInstructions: forgeTransientRuntimeCarrier?.developerInstructions,
       preserveNativeTurnSettings: usesSupervisionConnection,
     });
+    if (forgeAdditionalContext) {
+      turnStartParams.additionalContext = {
+        ...(turnStartParams.additionalContext ?? {}),
+        ...forgeAdditionalContext,
+      };
+    }
     codexModelCallDiagnostics.setRequestPayloadBytes(utf8JsonByteLength(turnStartParams));
     if (forgeTransientRuntimeCarrier) {
       const nativeInputText = JSON.stringify(turnStartParams.input);
       const developerInstructions =
         turnStartParams.collaborationMode?.settings.developer_instructions ?? "";
+      const forgeContextEntries = Object.entries(turnStartParams.additionalContext ?? {})
+        .filter(([key]) => key.startsWith("forge_current_turn_context_"))
+        .toSorted(([left], [right]) => left.localeCompare(right));
+      const additionalContextText = forgeContextEntries.map(([, entry]) => entry.value).join("");
       embeddedAgentLog.info("forge transient runtime context turn-start placement", {
         runId: params.runId,
         nativeInputHasRoomMarker: nativeInputText.includes("[FORGE_LIVE_CHANNEL_30_BEGIN]"),
         developerHasRoomMarker: developerInstructions.includes(
           "[FORGE_LIVE_CHANNEL_30_BEGIN]",
         ),
-        developerEndsWithForgeContext: developerInstructions.endsWith(
-          "</forge_current_turn_context>",
+        additionalContextHasRoomMarker: additionalContextText.includes(
+          "[FORGE_LIVE_CHANNEL_30_BEGIN]",
         ),
+        additionalContextChunkCount: forgeContextEntries.length,
         nativeInputChars: nativeInputText.length,
         developerInstructionChars: developerInstructions.length,
+        additionalContextChars: additionalContextText.length,
       });
     }
     state.latestStartupErrorNotification = undefined;
