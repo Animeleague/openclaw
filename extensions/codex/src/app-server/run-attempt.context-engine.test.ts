@@ -486,7 +486,7 @@ describe("runCodexAppServerAttempt context-engine lifecycle", () => {
     await run;
   });
 
-  it("keeps Forge last-10 context transient and late across resumed Codex turns", async () => {
+  it("keeps Forge last-10 context in native additionalContext across resumed Codex turns", async () => {
     const roomContext = [
       "[FORGE_LIVE_CHANNEL_30_BEGIN]",
       "Previous messages from this Discord channel, oldest first; 2 shown:",
@@ -504,8 +504,8 @@ describe("runCodexAppServerAttempt context-engine lifecycle", () => {
       ]),
     );
 
-    const sessionFile = path.join(tempDir, "forge-transient-tail.jsonl");
-    const workspaceDir = path.join(tempDir, "forge-transient-tail-workspace");
+    const sessionFile = path.join(tempDir, "forge-additional-context.jsonl");
+    const workspaceDir = path.join(tempDir, "forge-additional-context-workspace");
     const params = createParams(sessionFile, workspaceDir);
     params.messageProvider = "discord";
     params.prompt = "[meta channel=discord]\nactual Discord request";
@@ -528,17 +528,31 @@ describe("runCodexAppServerAttempt context-engine lifecycle", () => {
         "turn/start collaborationMode settings",
       );
       const developerInstructions = optionalString(settings.developer_instructions);
+      const additionalContext = requireRecord(
+        turnStart.additionalContext,
+        "turn/start additionalContext",
+      );
+      const forgeEntries = Object.entries(additionalContext)
+        .filter(([key]) => key.startsWith("forge_current_turn_context_"))
+        .toSorted(([left], [right]) => left.localeCompare(right));
+      const forgeContext = forgeEntries
+        .map(([, rawEntry]) => {
+          const entry = requireRecord(rawEntry, "Forge additionalContext entry");
+          expect(entry.kind).toBe("untrusted");
+          return optionalString(entry.value);
+        })
+        .join("");
 
       expect(input).toContain("[meta channel=discord]");
       expect(input).toContain("actual Discord request");
       expect(input).not.toContain("[FORGE_LIVE_CHANNEL_30_BEGIN]");
       expect(input).not.toContain("[FORGE_LIVE_CHANNEL_30_END]");
-      expect(developerInstructions).toContain("## Forge Current-Turn Runtime Context");
-      expect(developerInstructions).toContain(roomContext);
-      expect(
-        (developerInstructions.match(/\[FORGE_LIVE_CHANNEL_30_BEGIN\]/gu) ?? []).length,
-      ).toBe(1);
-      expect(developerInstructions.endsWith("</forge_current_turn_context>")).toBe(true);
+      expect(developerInstructions).not.toContain("[FORGE_LIVE_CHANNEL_30_BEGIN]");
+      expect(developerInstructions).not.toContain("[FORGE_LIVE_CHANNEL_30_END]");
+      expect(forgeEntries.length).toBeGreaterThan(0);
+      expect(forgeContext).toContain(roomContext);
+      expect((forgeContext.match(/\[FORGE_LIVE_CHANNEL_30_BEGIN\]/gu) ?? []).length).toBe(1);
+      expect((forgeContext.match(/\[FORGE_LIVE_CHANNEL_30_END\]/gu) ?? []).length).toBe(1);
     };
 
     const firstHarness = createSharedStartedThreadHarness();
