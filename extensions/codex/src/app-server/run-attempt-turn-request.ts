@@ -8,6 +8,7 @@ import {
   utf8JsonByteLength,
 } from "./attempt-diagnostics.js";
 import { isCodexAppServerIndeterminateRequestCancellationError } from "./client.js";
+import { extractForgeTransientRuntimeContext } from "./forge-transient-runtime-context.js";
 import { assertCodexTurnStartResponse } from "./protocol-validators.js";
 import type { CodexTurnStartResponse } from "./protocol.js";
 import { readCodexRateLimitsRevision } from "./rate-limit-cache.js";
@@ -17,6 +18,7 @@ import {
 } from "./run-attempt-lifecycle.js";
 import type { CodexAttemptResources } from "./run-attempt-resources.js";
 import type { CodexAttemptTurnState } from "./run-attempt-turn-state.js";
+import { joinPresentSections } from "./run-attempt-state.js";
 import { buildTurnStartParams } from "./thread-lifecycle.js";
 import { buildCodexUserPromptMessage } from "./transcript-mirror.js";
 
@@ -42,9 +44,32 @@ export async function prepareCodexAttemptTurnRequest(
     runAbortController,
   } = connection;
   const { state } = turnRuntime;
+  const forgeTransientRuntimeCarrier = extractForgeTransientRuntimeContext({
+    messageProvider: params.messageProvider ?? undefined,
+    promptText: turnState.codexTurnPromptText,
+  });
+  const nativeTurnPromptText =
+    forgeTransientRuntimeCarrier?.promptText ?? turnState.codexTurnPromptText;
+  const buildNativeCodexDeveloperInstructions = () =>
+    joinPresentSections(
+      buildRenderedCodexDeveloperInstructions(),
+      forgeTransientRuntimeCarrier?.developerInstructions,
+    );
+
+  if (forgeTransientRuntimeCarrier) {
+    embeddedAgentLog.info(
+      "forge transient runtime context routed through late turn-scoped developer instructions",
+      {
+        sessionId: params.sessionId,
+        transientChars: forgeTransientRuntimeCarrier.transientText.length,
+        durablePromptChars: forgeTransientRuntimeCarrier.promptText.length,
+      },
+    );
+  }
+
   const buildCodexModelInputMessages = () => [
     ...prompt.codexModelInputHistoryMessages,
-    buildCodexUserPromptMessage({ ...runtimeParams, prompt: turnState.codexTurnPromptText }),
+    buildCodexUserPromptMessage({ ...runtimeParams, prompt: nativeTurnPromptText }),
   ];
   const codexModelCallDiagnostics = createCodexModelCallDiagnosticEmitter({
     baseFields: {
@@ -67,7 +92,7 @@ export async function prepareCodexAttemptTurnRequest(
     capture: codexModelContentCapture,
     tools,
     buildInputMessages: buildCodexModelInputMessages,
-    buildSystemPrompt: buildRenderedCodexDeveloperInstructions,
+    buildSystemPrompt: buildNativeCodexDeveloperInstructions,
     onErrorDiagnostic: (error) => {
       embeddedAgentLog.debug("codex app-server model call diagnostic ended with error", {
         error: formatErrorMessage(error),
@@ -104,7 +129,7 @@ export async function prepareCodexAttemptTurnRequest(
       threadId: resourceState.thread.threadId,
       cwd: resourceState.codexExecutionCwd,
       appServer: turnAppServer,
-      promptText: turnState.codexTurnPromptText,
+      promptText: nativeTurnPromptText,
       sandboxPolicy: resourceState.codexSandboxPolicy,
       environmentSelection: resourceState.codexEnvironmentSelection,
       clearInheritedServiceTier: resourceState.thread.clearInheritedServiceTier,
@@ -114,6 +139,7 @@ export async function prepareCodexAttemptTurnRequest(
       turnScopedDeveloperInstructions: workspaceBootstrapContext.turnScopedDeveloperInstructions,
       skillsCollaborationInstructions: context.skillsCollaborationInstructions,
       memoryCollaborationInstructions: workspaceBootstrapContext.memoryCollaborationInstructions,
+      lateTurnScopedDeveloperInstructions: forgeTransientRuntimeCarrier?.developerInstructions,
       preserveNativeTurnSettings: usesSupervisionConnection,
     });
     codexModelCallDiagnostics.setRequestPayloadBytes(utf8JsonByteLength(turnStartParams));
@@ -197,8 +223,8 @@ export async function prepareCodexAttemptTurnRequest(
     model: usesSupervisionConnection
       ? (resourceState.thread.model ?? effectiveRuntimeModelId)
       : params.modelId,
-    systemPrompt: buildRenderedCodexDeveloperInstructions(),
-    prompt: turnState.codexTurnPromptText,
+    systemPrompt: buildNativeCodexDeveloperInstructions(),
+    prompt: nativeTurnPromptText,
     historyMessages: prompt.codexModelInputHistoryMessages,
     imagesCount: params.images?.length ?? 0,
     tools,
