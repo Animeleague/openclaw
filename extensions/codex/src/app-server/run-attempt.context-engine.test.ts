@@ -23,6 +23,7 @@ import { shouldEnableCodexAppServerNativeToolSurface } from "./dynamic-tool-buil
 import {
   assistantMessage,
   createParams as createSharedParams,
+  createResumeHarness as createSharedResumeHarness,
   createStartedThreadHarness as createSharedStartedThreadHarness,
   runCodexAppServerAttempt as runSharedCodexAppServerAttempt,
   setupRunAttemptTestHooks,
@@ -483,6 +484,80 @@ describe("runCodexAppServerAttempt context-engine lifecycle", () => {
 
     await harness.completeTurn();
     await run;
+  });
+
+  it("keeps Forge last-10 context transient and late across resumed Codex turns", async () => {
+    const roomContext = [
+      "[FORGE_LIVE_CHANNEL_30_BEGIN]",
+      "Previous messages from this Discord channel, oldest first; 2 shown:",
+      "- first canary",
+      "- second canary",
+      "[FORGE_LIVE_CHANNEL_30_END]",
+    ].join("\n");
+
+    initializeGlobalHookRunner(
+      createMockPluginRegistry([
+        {
+          hookName: "before_prompt_build",
+          handler: async () => ({ prependContext: roomContext }),
+        },
+      ]),
+    );
+
+    const sessionFile = path.join(tempDir, "forge-transient-tail.jsonl");
+    const workspaceDir = path.join(tempDir, "forge-transient-tail-workspace");
+    const params = createParams(sessionFile, workspaceDir);
+    params.messageProvider = "discord";
+    params.prompt = "[meta channel=discord]\nactual Discord request";
+
+    const assertTurn = (harness: { requests: Array<{ method: string; params: unknown }> }) => {
+      const request = harness.requests.find((entry) => entry.method === "turn/start");
+      const turnStart = requireRecord(request?.params, "turn/start params");
+      const input = requireArray(turnStart.input, "turn/start input")
+        .map((entry) => {
+          const item = requireRecord(entry, "turn/start input entry");
+          return item.type === "text" ? optionalString(item.text) : "";
+        })
+        .join("\n");
+      const collaborationMode = requireRecord(
+        turnStart.collaborationMode,
+        "turn/start collaborationMode",
+      );
+      const settings = requireRecord(
+        collaborationMode.settings,
+        "turn/start collaborationMode settings",
+      );
+      const developerInstructions = optionalString(settings.developer_instructions);
+
+      expect(input).toContain("[meta channel=discord]");
+      expect(input).toContain("actual Discord request");
+      expect(input).not.toContain("[FORGE_LIVE_CHANNEL_30_BEGIN]");
+      expect(input).not.toContain("[FORGE_LIVE_CHANNEL_30_END]");
+      expect(developerInstructions).toContain("## Forge Current-Turn Runtime Context");
+      expect(developerInstructions).toContain(roomContext);
+      expect(
+        (developerInstructions.match(/\[FORGE_LIVE_CHANNEL_30_BEGIN\]/gu) ?? []).length,
+      ).toBe(1);
+      expect(developerInstructions.endsWith("</forge_current_turn_context>")).toBe(true);
+    };
+
+    const firstHarness = createSharedStartedThreadHarness();
+    const firstRun = runCodexAppServerAttempt(params);
+    await firstHarness.waitForMethod("turn/start");
+    assertTurn(firstHarness);
+    await firstHarness.completeTurn({ threadId: "thread-1", turnId: "turn-1" });
+    await firstRun;
+
+    const secondHarness = createSharedResumeHarness();
+    const secondRun = runCodexAppServerAttempt({
+      ...params,
+      runId: "run-2",
+    });
+    await secondHarness.waitForMethod("turn/start");
+    assertTurn(secondHarness);
+    expect(secondHarness.requests.some((entry) => entry.method === "thread/resume")).toBe(true);
+    await secondHarness.completeTurn({ threadId: "thread-1", turnId: "turn-1" });
+    await secondRun;
   });
 
   it("bounds hook-appended prompts without an active context engine", async () => {
