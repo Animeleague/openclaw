@@ -143,6 +143,23 @@ export async function prepareCodexAttemptTurnRequest(
       preserveNativeTurnSettings: usesSupervisionConnection,
     });
     codexModelCallDiagnostics.setRequestPayloadBytes(utf8JsonByteLength(turnStartParams));
+    if (forgeTransientRuntimeCarrier) {
+      const nativeInputText = JSON.stringify(turnStartParams.input);
+      const developerInstructions =
+        turnStartParams.collaborationMode?.settings.developer_instructions ?? "";
+      embeddedAgentLog.info("forge transient runtime context turn-start placement", {
+        runId: params.runId,
+        nativeInputHasRoomMarker: nativeInputText.includes("[FORGE_LIVE_CHANNEL_30_BEGIN]"),
+        developerHasRoomMarker: developerInstructions.includes(
+          "[FORGE_LIVE_CHANNEL_30_BEGIN]",
+        ),
+        developerEndsWithForgeContext: developerInstructions.endsWith(
+          "</forge_current_turn_context>",
+        ),
+        nativeInputChars: nativeInputText.length,
+        developerInstructionChars: developerInstructions.length,
+      });
+    }
     state.latestStartupErrorNotification = undefined;
     state.rateLimitsRevisionBeforeLastTurnStart = readCodexRateLimitsRevision(resourceState.client);
     activeTurnRoute.armTurn();
