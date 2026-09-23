@@ -11,6 +11,7 @@ import {
   resolveCodexAppServerReplayBlockedReason,
 } from "./attempt-results.js";
 import { attemptTerminal, type EmbeddedRunAttemptResult } from "./attempt-terminal.js";
+import { commitForgeLunaRoomContextTransaction } from "./forge-luna-room-transaction.js";
 import { flattenCodexDynamicToolFunctions } from "./protocol.js";
 import { readCodexRateLimitsRevision, readRecentCodexRateLimits } from "./rate-limit-cache.js";
 import type { CodexAttemptActiveTurn } from "./run-attempt-active-turn.js";
@@ -310,16 +311,111 @@ export async function finalizeCodexAttempt(
   } else {
     codexModelCallDiagnostics.emitCompleted(result);
   }
-  const mirrorOutcome = await codexTranscriptMirrorRuntime.mirrorBestEffort({
-    params,
-    agentId: sessionAgentId,
-    notifyUserMessagePersisted,
-    result,
-    sessionKey: contextSessionKey,
-    cwd: effectiveCwd,
-    threadId: resourceState.thread.threadId,
-    turnId: activeTurnId,
-  });
+
+  const forgeResolvedModelId =
+    resourceState.thread.model ?? effectiveRuntimeModelId ?? params.modelId;
+  const forgeExactLunaNoReply =
+    attemptSucceeded &&
+    params.messageProvider === "discord" &&
+    forgeResolvedModelId.toLowerCase().includes("luna") &&
+    params.allowEmptyAssistantReplyAsSilent === true &&
+    result.assistantTexts.length === 1 &&
+    result.assistantTexts[0]?.trim() === "NO_REPLY";
+
+  const forgeRoomTransaction = state.forgeLunaRoomContextTransaction;
+  const forgeRoomTransactionOwnsActiveTurn =
+    attemptSucceeded &&
+    forgeRoomTransaction?.threadId === resourceState.thread.threadId &&
+    forgeRoomTransaction.turnId === activeTurnId;
+
+  const forgeAssistantText =
+    (typeof result.lastAssistant === "string" && result.lastAssistant.trim()
+      ? result.lastAssistant
+      : result.assistantTexts.at(-1) ?? "");
+
+  if (forgeRoomTransactionOwnsActiveTurn && forgeRoomTransaction) {
+    try {
+      const transactionResult = await commitForgeLunaRoomContextTransaction({
+        client: resourceState.client,
+        signal: runAbortController.signal,
+        threadId: forgeRoomTransaction.threadId,
+        turnId: forgeRoomTransaction.turnId,
+        cleanUserText: forgeRoomTransaction.cleanUserText,
+        assistantText: forgeAssistantText,
+        exactNoReply: forgeExactLunaNoReply,
+      });
+      state.forgeLunaRoomContextTransactionHandled = true;
+      embeddedAgentLog.info(
+        forgeExactLunaNoReply
+          ? "forge Luna exact NO_REPLY removed by room-context transaction"
+          : "forge Luna room-context transaction committed clean visible history",
+        {
+          runId: params.runId,
+          threadId: forgeRoomTransaction.threadId,
+          turnId: forgeRoomTransaction.turnId,
+          roomContextChars: forgeRoomTransaction.roomContextChars,
+          injectedCleanPair: transactionResult.injectedCleanPair,
+          cleanUserChars: forgeRoomTransaction.cleanUserText.length,
+          assistantChars: forgeAssistantText.length,
+        },
+      );
+    } catch (error) {
+      embeddedAgentLog.warn("forge Luna room-context transaction cleanup failed", {
+        runId: params.runId,
+        threadId: forgeRoomTransaction.threadId,
+        turnId: forgeRoomTransaction.turnId,
+        error: formatErrorMessage(error),
+      });
+    }
+  } else if (forgeExactLunaNoReply) {
+    // A silent Luna turn with no latest-10 block still must leave no native
+    // user/assistant history. Keep this as a narrow one-turn fallback.
+    try {
+      const transactionResult = await commitForgeLunaRoomContextTransaction({
+        client: resourceState.client,
+        signal: runAbortController.signal,
+        threadId: resourceState.thread.threadId,
+        turnId: activeTurnId,
+        cleanUserText: params.prompt,
+        assistantText: "NO_REPLY",
+        exactNoReply: true,
+      });
+      state.forgeLunaRoomContextTransactionHandled = true;
+      embeddedAgentLog.info("forge Luna exact NO_REPLY removed without room-context tail", {
+        runId: params.runId,
+        threadId: resourceState.thread.threadId,
+        turnId: activeTurnId,
+        injectedCleanPair: transactionResult.injectedCleanPair,
+      });
+    } catch (error) {
+      embeddedAgentLog.warn("forge Luna exact NO_REPLY fallback cleanup failed", {
+        runId: params.runId,
+        threadId: resourceState.thread.threadId,
+        turnId: activeTurnId,
+        error: formatErrorMessage(error),
+      });
+    }
+  }
+
+  // Exact NO_REPLY is a transport-level silent turn. Do not create external
+  // transcript history for a turn whose intended native result is no history.
+  const mirrorOutcome = forgeExactLunaNoReply
+    ? {
+        assistantTranscriptOwned: false,
+        assistantTranscriptIdempotencyKey: undefined,
+        terminalAnchor: undefined,
+        mirroredMessages: [],
+      }
+    : await codexTranscriptMirrorRuntime.mirrorBestEffort({
+        params,
+        agentId: sessionAgentId,
+        notifyUserMessagePersisted,
+        result,
+        sessionKey: contextSessionKey,
+        cwd: effectiveCwd,
+        threadId: resourceState.thread.threadId,
+        turnId: activeTurnId,
+      });
   const { assistantTranscriptOwned, assistantTranscriptIdempotencyKey, terminalAnchor } =
     mirrorOutcome;
   const shouldCaptureSettledTurnFinalizationContext =
