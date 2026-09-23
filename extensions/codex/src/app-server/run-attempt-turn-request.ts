@@ -8,6 +8,7 @@ import {
   utf8JsonByteLength,
 } from "./attempt-diagnostics.js";
 import { isCodexAppServerIndeterminateRequestCancellationError } from "./client.js";
+import { extractForgeLunaRoomContextTurn } from "./forge-luna-room-context.js";
 import { assertCodexTurnStartResponse } from "./protocol-validators.js";
 import type { CodexTurnStartResponse } from "./protocol.js";
 import { readCodexRateLimitsRevision } from "./rate-limit-cache.js";
@@ -42,9 +43,25 @@ export async function prepareCodexAttemptTurnRequest(
     runAbortController,
   } = connection;
   const { state } = turnRuntime;
+  const forgeLunaRoomContext = extractForgeLunaRoomContextTurn({
+    messageProvider: params.messageProvider ?? undefined,
+    promptText: turnState.codexTurnPromptText,
+  });
+  const nativeTurnPromptText =
+    forgeLunaRoomContext?.dirtyPromptText ?? turnState.codexTurnPromptText;
+
+  if (forgeLunaRoomContext) {
+    embeddedAgentLog.info("forge Luna room context prepared as transactional dirty turn", {
+      runId: params.runId,
+      cleanPromptChars: forgeLunaRoomContext.cleanPromptText.length,
+      roomContextChars: forgeLunaRoomContext.roomContextText.length,
+      dirtyPromptChars: forgeLunaRoomContext.dirtyPromptText.length,
+    });
+  }
+
   const buildCodexModelInputMessages = () => [
     ...prompt.codexModelInputHistoryMessages,
-    buildCodexUserPromptMessage({ ...runtimeParams, prompt: turnState.codexTurnPromptText }),
+    buildCodexUserPromptMessage({ ...runtimeParams, prompt: nativeTurnPromptText }),
   ];
   const codexModelCallDiagnostics = createCodexModelCallDiagnosticEmitter({
     baseFields: {
@@ -104,7 +121,7 @@ export async function prepareCodexAttemptTurnRequest(
       threadId: resourceState.thread.threadId,
       cwd: resourceState.codexExecutionCwd,
       appServer: turnAppServer,
-      promptText: turnState.codexTurnPromptText,
+      promptText: nativeTurnPromptText,
       sandboxPolicy: resourceState.codexSandboxPolicy,
       environmentSelection: resourceState.codexEnvironmentSelection,
       clearInheritedServiceTier: resourceState.thread.clearInheritedServiceTier,
@@ -140,6 +157,21 @@ export async function prepareCodexAttemptTurnRequest(
         }),
       );
       acceptedTurnId = startedTurn.turn.id;
+      if (forgeLunaRoomContext) {
+        state.forgeLunaRoomContextTransaction = {
+          threadId: resourceState.thread.threadId,
+          turnId: startedTurn.turn.id,
+          cleanUserText: params.prompt.trim() || forgeLunaRoomContext.cleanPromptText,
+          roomContextChars: forgeLunaRoomContext.roomContextText.length,
+        };
+        state.forgeLunaRoomContextTransactionHandled = false;
+        embeddedAgentLog.info("forge Luna room context armed clean-turn transaction", {
+          runId: params.runId,
+          threadId: resourceState.thread.threadId,
+          turnId: startedTurn.turn.id,
+          roomContextChars: forgeLunaRoomContext.roomContextText.length,
+        });
+      }
       throwIfTurnStartAcceptedAfterAbort();
       return startedTurn;
     } catch (error) {
