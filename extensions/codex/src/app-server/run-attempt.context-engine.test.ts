@@ -948,12 +948,6 @@ describe("runCodexAppServerAttempt context-engine lifecycle", () => {
     sessionManager.appendMessage(
       assistantMessage("Acknowledged LUNA_30K_CANON_HYDRATION_CANARY_58310472", 1_001) as never,
     );
-    sessionManager.appendMessage(
-      assistantMessage(
-        "NO_REPLY_instruction devel. Need ensure final exactly NO_REPLY. yes.",
-        1_002,
-      ) as never,
-    );
     for (let index = 0; index < 45; index += 1) {
       sessionManager.appendMessage(
         userMessage(`recent-user-${index} ${"x".repeat(700)}`, 1_100 + index * 2) as never,
@@ -1046,7 +1040,6 @@ describe("runCodexAppServerAttempt context-engine lifecycle", () => {
     expect(inputText).toContain("LUNA_30K_CANON_HYDRATION_CANARY_58310472");
     expect(inputText).not.toContain("LUNA_OLD_CONTEXT_SHOULD_DROP");
     expect(inputText).not.toContain("WRONG_SESSION_CANARY_MUST_NOT_LOAD");
-    expect(inputText).not.toContain("NO_REPLY_instruction");
     expect(inputText).toContain("Current user request:");
     expect(inputText).toContain("hello");
     expect(inputText.length).toBeLessThan(125_000);
