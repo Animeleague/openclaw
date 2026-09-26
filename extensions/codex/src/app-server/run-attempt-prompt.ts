@@ -73,12 +73,22 @@ export async function prepareCodexAttemptPrompt(context: CodexAttemptContext) {
     sandbox,
   } = connection;
   const { toolBridge } = attemptTools;
+  // FORGE_LUNA_FRESH_HYDRATION_20K_V1
+  // A newly started Luna native thread (not a warm resume) receives a bounded
+  // recent canonical tail. Keep the proof deliberately local to Luna; Sol
+  // rollover/session policy is unchanged in this stage.
+  const forgeFreshLunaHydrationMaxChars = 20_000 * 4;
+  const forgeRuntimeIsLuna =
+    effectiveRuntimeModelId.trim().toLowerCase().split("/").at(-1) ===
+    "gpt-5.6-luna";
   const applyFreshThreadContinuityProjection = () => {
     const projection = projectContextEngineAssemblyForCodex({
       assembledMessages: historyState.messages,
       originalHistoryMessages: historyState.messages,
       prompt: params.prompt,
-      maxRenderedContextChars: codexContextProjectionMaxChars,
+      maxRenderedContextChars: forgeRuntimeIsLuna
+        ? Math.min(codexContextProjectionMaxChars, forgeFreshLunaHydrationMaxChars)
+        : codexContextProjectionMaxChars,
     });
     promptState.promptText = projection.promptText;
     promptState.promptContextRange = projection.promptContextRange;
@@ -399,6 +409,13 @@ export async function prepareCodexAttemptPrompt(context: CodexAttemptContext) {
       return true;
     }
     if (action === "started" && promptState.staleBindingContinuityForcedFreshStart) {
+      return true;
+    }
+    // A gateway restart or other fresh Luna sidecar must hydrate from canonical
+    // history even when an inactive bootstrap binding would normally suppress
+    // generic fresh-thread projection.
+    if (action === "started" && forgeRuntimeIsLuna) {
+      applyFreshThreadContinuityProjection();
       return true;
     }
     if (action === "started" && promptState.inactiveThreadBootstrapBindingForcedFreshStart) {
