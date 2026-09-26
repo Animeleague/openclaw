@@ -910,6 +910,130 @@ describe("runCodexAppServerAttempt context-engine lifecycle", () => {
     await run;
   });
 
+  it("hydrates a newly started Luna thread with a bounded ~20k-token canonical tail", async () => {
+    const sessionFile = path.join(tempDir, "session.jsonl");
+    const workspaceDir = path.join(tempDir, "workspace");
+    const agentDir = path.join(tempDir, "agent");
+    const sessionManager = openFileBackedSessionManagerForTest(sessionFile, {
+      sessionId: "session-1",
+    });
+
+    sessionManager.appendMessage(
+      userMessage(`LUNA_OLD_CONTEXT_SHOULD_DROP ${"o".repeat(20_000)}`, 1) as never,
+    );
+    for (let index = 0; index < 40; index += 1) {
+      sessionManager.appendMessage(
+        userMessage(`older-user-${index} ${"u".repeat(700)}`, 10 + index * 2) as never,
+      );
+      sessionManager.appendMessage(
+        assistantMessage(`older-assistant-${index} ${"a".repeat(700)}`, 11 + index * 2) as never,
+      );
+    }
+
+    // This canary is deliberately more than 20 completed exchanges behind the
+    // current turn, proving hydration is not the ordinary native-delta window.
+    sessionManager.appendMessage(
+      userMessage("LUNA_20K_HYDRATION_CANARY_58310472", 1_000) as never,
+    );
+    sessionManager.appendMessage(
+      assistantMessage("Acknowledged LUNA_20K_HYDRATION_CANARY_58310472", 1_001) as never,
+    );
+    for (let index = 0; index < 30; index += 1) {
+      sessionManager.appendMessage(
+        userMessage(`recent-user-${index} ${"x".repeat(700)}`, 1_100 + index * 2) as never,
+      );
+      sessionManager.appendMessage(
+        assistantMessage(`recent-assistant-${index} ${"y".repeat(700)}`, 1_101 + index * 2) as never,
+      );
+    }
+
+    await writeCodexAppServerBinding(sessionFile, {
+      threadId: "thread-stale-luna",
+      cwd: workspaceDir,
+      dynamicToolsFingerprint: "[]",
+      contextEngine: {
+        schemaVersion: 1,
+        engineId: "lossless-claw",
+        policyFingerprint:
+          '{"schemaVersion":1,"engineId":"lossless-claw","ownsCompaction":true,"projectionMaxChars":24000}',
+        projection: {
+          schemaVersion: 1,
+          mode: "thread_bootstrap",
+          epoch: "epoch-stale",
+        },
+      },
+    });
+    await fs.writeFile(
+      path.join(path.dirname(sessionFile), "sessions.json"),
+      JSON.stringify({
+        "agent:main:session-1": {
+          sessionFile,
+          totalTokens: 12_000,
+        },
+      }),
+    );
+    const rolloutDir = path.join(agentDir, "codex-home", "sessions");
+    await fs.mkdir(rolloutDir, { recursive: true });
+    await fs.writeFile(
+      path.join(rolloutDir, "rollout-thread-stale-luna.jsonl"),
+      `${JSON.stringify({
+        payload: {
+          type: "token_count",
+          info: {
+            last_token_usage: {
+              total_tokens: 300_000,
+            },
+          },
+        },
+      })}\n`,
+    );
+
+    const harness = createStartedThreadHarness(async (method) => {
+      if (method === "thread/resume") {
+        return threadStartResult("thread-stale-luna");
+      }
+      if (method === "thread/start") {
+        return threadStartResult("thread-fresh-luna");
+      }
+      return undefined;
+    });
+    const params = createParams(sessionFile, workspaceDir);
+    params.agentDir = agentDir;
+    params.modelId = "gpt-5.6-luna";
+    params.model = {
+      ...params.model,
+      id: "gpt-5.6-luna",
+    };
+    params.contextTokenBudget = 258_400;
+    params.config = {
+      agents: {
+        defaults: {
+          compaction: {
+            maxActiveTranscriptBytes: "1mb",
+          },
+        },
+      },
+    } as EmbeddedRunAttemptParams["config"];
+
+    const run = runCodexAppServerAttempt(params);
+    await harness.waitForMethod("turn/start");
+
+    expect(harness.requests.map((request) => request.method)).toEqual([
+      "thread/start",
+      "turn/start",
+    ]);
+    const inputText = getRequestInputText(harness);
+    expect(inputText).toContain("OpenClaw assembled context for this turn:");
+    expect(inputText).toContain("LUNA_20K_HYDRATION_CANARY_58310472");
+    expect(inputText).not.toContain("LUNA_OLD_CONTEXT_SHOULD_DROP");
+    expect(inputText).toContain("Current user request:");
+    expect(inputText).toContain("hello");
+    expect(inputText.length).toBeLessThan(85_000);
+
+    await harness.completeTurn("completed", "thread-fresh-luna");
+    await run;
+  });
+
   it("keeps mirrored history when an inactive per-turn context-engine binding starts fresh", async () => {
     const sessionFile = path.join(tempDir, "session.jsonl");
     const workspaceDir = path.join(tempDir, "workspace");
