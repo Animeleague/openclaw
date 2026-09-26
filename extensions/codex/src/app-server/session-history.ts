@@ -36,6 +36,44 @@ export type CodexMirroredSessionHistoryTarget = {
   sessionTarget?: Partial<SessionTranscriptTargetParams>;
 };
 
+/**
+ * Reads the authoritative OpenClaw canonical JSONL session selected by the
+ * gateway. Unlike mirrored native history, the canonical session header has its
+ * own stable ID and must not be compared with a disposable Codex thread/session ID.
+ */
+export async function readCodexCanonicalSessionHistoryMessages(
+  sessionFile: string,
+): Promise<AgentMessage[] | undefined> {
+  try {
+    const entries = parseSessionEntries(await fs.readFile(sessionFile, "utf-8")) as SessionEntry[];
+    if (entries.length === 0) {
+      return [];
+    }
+    const firstEntry = entries[0] as { type?: unknown; id?: unknown } | undefined;
+    if (firstEntry?.type !== "session" || typeof firstEntry.id !== "string") {
+      return undefined;
+    }
+    migrateSessionEntries(entries);
+    const sessionEntries = entries.filter((entry): entry is SessionEntry => {
+      return (
+        entry !== null &&
+        typeof entry === "object" &&
+        !Array.isArray(entry) &&
+        (entry as { type?: unknown }).type !== "session"
+      );
+    });
+    return sanitizeCodexHistoryImagePayloads(
+      buildSessionContext(sessionEntries).messages,
+      "codex canonical history",
+    );
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return [];
+    }
+    return undefined;
+  }
+}
+
 /** Returns sanitized session-context messages for a Codex mirrored session file. */
 export async function readCodexMirroredSessionHistoryMessages(
   target: CodexMirroredSessionHistoryTarget,
