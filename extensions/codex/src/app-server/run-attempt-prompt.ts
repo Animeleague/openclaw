@@ -8,8 +8,8 @@ import {
 import {
   buildCodexSystemPromptReport,
   prependCodexOpenClawPromptContext,
+  readCanonicalSessionHistoryMessages,
   readContextEngineThreadBootstrapProjection,
-  readMirroredSessionHistoryMessages,
   resolveCodexDeliveryHintPreservedInputRange,
   resolveContextEngineBootstrapProjectionDecision,
 } from "./attempt-context.js";
@@ -85,12 +85,7 @@ export async function prepareCodexAttemptPrompt(context: CodexAttemptContext) {
   const selectFreshLunaCanonicalMessages = (messages: typeof historyState.messages) =>
     messages.filter((message) => message.role === "user" || message.role === "assistant");
   const readFreshLunaCanonicalHistory = async () => {
-    const canonicalMessages = await readMirroredSessionHistoryMessages({
-      agentId: sessionAgentId,
-      sessionFile: params.sessionFile,
-      sessionId: params.sessionId,
-      sessionKey: contextSessionKey,
-    });
+    const canonicalMessages = await readCanonicalSessionHistoryMessages(params.sessionFile);
     return selectFreshLunaCanonicalMessages(canonicalMessages ?? []);
   };
   const applyFreshThreadContinuityProjection = (
