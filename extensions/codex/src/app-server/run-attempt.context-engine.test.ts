@@ -916,7 +916,9 @@ describe("runCodexAppServerAttempt context-engine lifecycle", () => {
     const workspaceDir = path.join(tempDir, "workspace");
     const agentDir = path.join(tempDir, "agent");
     const sessionManager = openFileBackedSessionManagerForTest(sessionFile, {
-      sessionId: "session-1",
+      // Canon has its own stable OpenClaw session ID. It intentionally differs
+      // from the disposable Codex runtime session ID used by createParams().
+      sessionId: "canonical-session-1",
     });
     const decoySessionManager = openFileBackedSessionManagerForTest(decoySessionFile, {
       sessionId: "session-decoy",
