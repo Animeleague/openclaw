@@ -1,0 +1,67 @@
+FORGE 1.2.2a LIVE BANK - 2026-09-26
+
+Branch:
+forge/1.2.2a-live-bank-2026-09-26
+
+BASELINE
+Codex 1.2.1 live SHA256:
+9afaf1903efe3958940df446db9b0d71b0e01d5b820f869a1197e70f9452da96
+
+MONITOR
+Package version:
+1.1.9
+
+Step A live dist/adapter.js SHA256:
+692f4fe11ea71a477498cbb87c2b4915fa5d46cad524a4e18e4bdc5171555558
+
+Step A deployment script SHA256:
+6f7b9de7e9db6301e97d1f93d76fce78a08cc6aa30e3a07bdaa764a6942331bb
+
+CODEX
+Broken Step B v1 candidate SHA256:
+3795fe18aae09ffbd7a68fb4a27f0e0cb1e323e4168f889278822fc0818429b7
+
+Accepted Step B2 fixed candidate SHA256:
+46abcc30d783be83ad152566ae01fbe0f54918d8e86c48cce9cae32726b963b8
+
+Step B2 deployment script SHA256:
+cee04d2174fe5f967f8566c732ccf74f23445f231fb3e256152891af1afd1917
+
+CONFIG
+Sol rollover tokens:
+80000
+
+Luna rollover tokens:
+NOT YET IMPLEMENTED
+
+Permanent Resident DM routing:
+ABSENT BY DESIGN
+
+PRIMARY ACCEPTANCE LUNA SESSION
+01a0df9d-ecad-71e3-a2c3-aa8807274e26
+
+SOL ANOMALY SESSIONS
+oversized post-restart Sol:
+01a0dfa5-1d37-7253-8f56-2d226b1930dd
+
+replacement rolled Sol:
+01a0dfa6-2db1-7603-b444-c793c2128487
+
+STATUS
+1.2.2a room dirty-turn / rollback / clean reinjection:
+ACCEPTED
+
+Exact NO_REPLY durable residue:
+PASS - no reinjection
+
+Recent room-context durable residue:
+PASS - dirty turn rolled back
+
+Luna survives Sol/Luna alternation:
+PASS
+
+Luna warm cache / staircase:
+PASS in observed tests
+
+Sol post-gateway bootstrap sizing:
+OPEN ISSUE - investigate before 1.2.2b
