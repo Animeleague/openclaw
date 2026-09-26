@@ -1,0 +1,67 @@
+Forge 1.2.0 live bank - hash manifest
+Date: 2026-09-26
+
+STATUS
+Live-proven and accepted.
+Purpose: fresh Luna native canonical bootstrap after gateway/native-thread renewal.
+
+ACCEPTED LIVE CODEX
+run-attempt-FUyOjGCV.js
+SHA-256 e406db4b0c052b784d7a363ab048380ed9136ecb429fa46d195f01de40f4eb1c
+
+provider-capabilities-CDnHbmUZ.js
+SHA-256 9f7eb3c6bdbdaba427858b94f7c4e7e57308a1bbf1ad92451aea83f70855467c
+
+PROVEN INSTALLER
+Apply-Forge-LunaNativeCanon30k-Stage1-v5-1.ps1
+SHA-256 4ead5b60a9538c3068368b214de3641a3fb859ba0d8d24861daedde916eeacb4
+
+LIVE PROOF ROLLOUT
+rollout-2026-09-26T18-11-20-01a0deb3-1c71-7293-a647-b3a7133227c0(1).jsonl
+SHA-256 38cfa9919d9775ace82695a2e8bb692d5bcb05c37afd80626453cfdefb55227b
+
+ACCEPTANCE RESULTS
+Fresh Luna first turn:
+- input_tokens 56407
+- cached_input_tokens 0
+
+Warm turns:
+- 57154 input / 56064 cached
+- 57971 input / 56064 cached
+- 58785 input / 57088 cached
+- 59623 input / 58112 cached
+- 60509 input / 59136 cached
+
+Observed warm-cache reuse: roughly 97-98%.
+Observed context growth after bootstrap: roughly 750-900 input tokens per test turn.
+Model context window: 258400 tokens.
+No repeated ~30k canonical bootstrap on warm turns.
+No staircase-style large context jumps observed.
+
+CONTINUITY PROOF
+- Fresh native history expanded from the old 40-message / 20-pair handoff to about 1051 historical messages.
+- Oldest recovered conversational history reached 2026-09-22.
+- Recall tests successfully used old canonical history after restart.
+- Speaker provenance was retained in native user-history text so different Discord users remain distinguishable.
+
+ARCHITECTURE
+- Fresh Luna only.
+- Trigger: native thread lifecycle action "started".
+- Source: exact OpenClaw canonical params.sessionFile.
+- Canonical reader retains existing OpenClaw parse/migrate/context-build/image-sanitization path.
+- Native bootstrap is injected with thread/inject_items before turn/start.
+- Canonical conversational budget: 120000 rendered text chars (approximately 30k tokens by planning heuristic).
+- Warm/resumed Luna does not re-bootstrap.
+- Sol behaviour is unchanged in 1.2.0.
+- Existing Sol/Luna native-delta bridge remains active.
+- Existing monitor projection bypass remains active.
+- Provider canonical-file resolver bypass remains scoped to the fresh canonical read.
+
+KNOWN SMALL CLEANUP
+A handful of recent native-delta pairs can still appear after the initial canonical bootstrap when exact-pair dedupe does not match formatting/provenance differences. This was not observed to damage caching or continuity and is not a blocker for 1.2.0.
+
+SOURCE/BANKING NOTE
+1.2.0 follows the 1.1.9 live-bank convention: the bank records the exact accepted compiled live bytes and proven installer. The current TypeScript feature branch still contains earlier prompt-projection experiments and MUST NOT be treated as the 1.2.0 source of truth.
+
+NEXT
+1.2.1: add deliberate Sol native rollover and reuse the proven native canonical bootstrap on the fresh Sol generation.
