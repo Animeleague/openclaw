@@ -1,0 +1,90 @@
+Forge 1.2.1 live bank - hash manifest
+Date: 2026-09-26
+
+STATUS
+Live-proven and accepted.
+Purpose: deliberate low-cost Sol native rolling with canonical continuity preserved.
+
+ACCEPTED LIVE CODEX
+run-attempt-FUyOjGCV.js
+SHA-256 9afaf1903efe3958940df446db9b0d71b0e01d5b820f869a1197e70f9452da96
+
+provider-capabilities-CDnHbmUZ.js
+SHA-256 9f7eb3c6bdbdaba427858b94f7c4e7e57308a1bbf1ad92451aea83f70855467c
+
+PROVEN INSTALLER
+Apply-Forge-1.2.1-Sol80kRolling-v1.ps1
+SHA-256 a4165e23e294f400ef8b541a75a797af6bfca06559af9caf0d657a5bba331793
+
+SOL ACCEPTANCE ROLLOUT
+rollout-2026-09-26T18-45-24-01a0ded2-4cc3-7e63-88b5-ad5a0759f88b.jsonl
+SHA-256 3636b8544c9f9ba7a5744b6b112e9447569b2c685c9eecdc2b677f8ab7b8d369
+
+LUNA REGRESSION ROLLOUT
+rollout-2026-09-26T18-47-14-01a0ded3-f96b-75a1-9367-48b466d0de9a.jsonl
+SHA-256 179b5f0f12f286069ace5cacde031554ab63f04f4df9c6cf7b3d21bc31e3b6ab
+
+CONFIGURED POLICY
+continuity.solRolloverTokens = 80000
+
+Luna does NOT have a dedicated token rollover cap in 1.2.1.
+The existing Luna sidecar early-return still bypasses the Sol hardcap path.
+Fresh Luna bootstrap from 1.2.0 remains active.
+
+SOL ACCEPTANCE RESULTS
+Previous warm Sol before rollover:
+- approximately 128.6k input/context tokens
+- approximately 99.8% cache reuse on the final observed old-thread turn
+
+Fresh Sol native generation:
+- native session: 01a0ded2-4cc3-7e63-88b5-ad5a0759f88b
+- first turn: 56345 input / 0 cached
+- second turn: 56453 input / 56192 cached
+- third turn: 56530 input / 56320 cached
+- warm cache reuse: approximately 99.5-99.6%
+- context growth after bootstrap: +108 then +77 input tokens
+- no repeated canonical bootstrap
+- no staircase-style context growth
+
+CONTINUITY PROOF
+Pre-rollover canary: 583914
+The fresh Sol generation correctly recalled 583914 after rollover.
+The new Sol contained the bounded canonical tail rather than resuming the old ~128.6k native thread.
+
+LUNA REGRESSION RESULTS
+Fresh Luna native session:
+- native session: 01a0ded3-f96b-75a1-9367-48b466d0de9a
+- first observed turn: 55922 input / 0 cached
+- next warm turn: 56834 input / 55040 cached
+- warm cache reuse: approximately 96.8%
+- correctly recalled Sol canary 583914
+- no evidence that the Sol 80k hardcap affected Luna
+
+ARCHITECTURE
+- Sol completed-turn rollover threshold is config-driven from continuity.solRolloverTokens.
+- Current Sol threshold: 80000.
+- Warm Sol remains on the current native thread below the rollover policy.
+- When rollover is armed, the next Sol generation starts fresh.
+- Fresh Sol reuses the same native canonical bootstrap mechanism proven for Luna in 1.2.0.
+- Fresh canonical bootstrap remains lifecycle-gated to action === "started".
+- Canonical conversational budget remains 120000 rendered chars, approximately 30k conversational tokens by planning heuristic.
+- Existing Sol/Luna native delta bridge remains active.
+- Exact-pair canonical/native-delta dedupe now applies after either fresh Sol or fresh Luna canonical bootstrap.
+- Provider canonical reader/sanitizer remains unchanged.
+- Existing monitor routing/privacy/transient-tool mechanics remain unchanged.
+
+BANKING NOTE
+1.2.1 follows the 1.1.9 / 1.2.0 live-bank convention: exact accepted compiled bytes plus the proven installer and proof hashes are the production source of truth.
+
+NEXT - 1.2.2
+Tidy-up release:
+1. Restore Sol's transient view of the previous 10 PUBLIC same-channel Discord messages/turns.
+   - transient only
+   - do not persist into native history
+   - preserve cache stability
+   - exclude private/DM/staff-only content as required by existing routing/privacy rules
+2. Add a separate Luna rollover cap:
+   continuity.lunaRolloverTokens = 200000
+   - do not reuse the Sol 80k threshold
+   - clean Luna sidecar rollover at 200k
+   - fresh Luna continues to use the existing ~30k canonical bootstrap
