@@ -29,7 +29,10 @@ import type { CodexDynamicToolFunctionSpec, CodexDynamicToolSpec, JsonValue } fr
 import { flattenCodexDynamicToolFunctions } from "./protocol.js";
 import { isJsonObject } from "./protocol.js";
 import type { CodexAppServerThreadBinding } from "./session-binding.js";
-import { readCodexMirroredSessionHistoryMessages } from "./session-history.js";
+import {
+  readCodexCanonicalSessionHistoryMessages,
+  readCodexMirroredSessionHistoryMessages,
+} from "./session-history.js";
 import {
   areCodexDynamicToolFingerprintsCompatible,
   buildContextEngineBinding,
@@ -90,6 +93,19 @@ export async function readMirroredSessionHistoryMessages(params: {
   if (!messages) {
     embeddedAgentLog.warn("failed to read mirrored session history for codex harness hooks", {
       sessionFile: params.sessionFile,
+    });
+  }
+  return messages;
+}
+
+/** Reads the authoritative OpenClaw canonical JSONL session selected by the gateway. */
+export async function readCanonicalSessionHistoryMessages(
+  sessionFile: string,
+): Promise<AgentMessage[] | undefined> {
+  const messages = await readCodexCanonicalSessionHistoryMessages(sessionFile);
+  if (!messages) {
+    embeddedAgentLog.warn("failed to read canonical session history for fresh Luna hydration", {
+      sessionFile,
     });
   }
   return messages;
