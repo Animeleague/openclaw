@@ -910,40 +910,59 @@ describe("runCodexAppServerAttempt context-engine lifecycle", () => {
     await run;
   });
 
-  it("hydrates a newly started Luna thread with a bounded ~20k-token canonical tail", async () => {
+  it("hydrates a fresh Luna thread from the exact active canon with a bounded ~30k-token tail", async () => {
     const sessionFile = path.join(tempDir, "session.jsonl");
+    const decoySessionFile = path.join(tempDir, "older-session.jsonl");
     const workspaceDir = path.join(tempDir, "workspace");
     const agentDir = path.join(tempDir, "agent");
     const sessionManager = openFileBackedSessionManagerForTest(sessionFile, {
       sessionId: "session-1",
     });
+    const decoySessionManager = openFileBackedSessionManagerForTest(decoySessionFile, {
+      sessionId: "session-decoy",
+    });
 
-    sessionManager.appendMessage(
-      userMessage(`LUNA_OLD_CONTEXT_SHOULD_DROP ${"o".repeat(20_000)}`, 1) as never,
+    decoySessionManager.appendMessage(
+      userMessage("WRONG_SESSION_CANARY_MUST_NOT_LOAD", 1) as never,
     );
-    for (let index = 0; index < 40; index += 1) {
+    sessionManager.appendMessage(
+      userMessage(`LUNA_OLD_CONTEXT_SHOULD_DROP ${"o".repeat(30_000)}`, 1) as never,
+    );
+    for (let index = 0; index < 50; index += 1) {
       sessionManager.appendMessage(
         userMessage(`older-user-${index} ${"u".repeat(700)}`, 10 + index * 2) as never,
       );
       sessionManager.appendMessage(
-        assistantMessage(`older-assistant-${index} ${"a".repeat(700)}`, 11 + index * 2) as never,
+        assistantMessage(
+          `older-assistant-${index} ${"a".repeat(700)}`,
+          11 + index * 2,
+        ) as never,
       );
     }
 
-    // This canary is deliberately more than 20 completed exchanges behind the
-    // current turn, proving hydration is not the ordinary native-delta window.
+    // More than 20 completed exchanges follow this canary, so loading it proves
+    // this is the canonical session tail rather than the short Sol->Luna delta.
     sessionManager.appendMessage(
-      userMessage("LUNA_20K_HYDRATION_CANARY_58310472", 1_000) as never,
+      userMessage("LUNA_30K_CANON_HYDRATION_CANARY_58310472", 1_000) as never,
     );
     sessionManager.appendMessage(
-      assistantMessage("Acknowledged LUNA_20K_HYDRATION_CANARY_58310472", 1_001) as never,
+      assistantMessage("Acknowledged LUNA_30K_CANON_HYDRATION_CANARY_58310472", 1_001) as never,
     );
-    for (let index = 0; index < 30; index += 1) {
+    sessionManager.appendMessage(
+      assistantMessage(
+        "NO_REPLY_instruction devel. Need ensure final exactly NO_REPLY. yes.",
+        1_002,
+      ) as never,
+    );
+    for (let index = 0; index < 45; index += 1) {
       sessionManager.appendMessage(
         userMessage(`recent-user-${index} ${"x".repeat(700)}`, 1_100 + index * 2) as never,
       );
       sessionManager.appendMessage(
-        assistantMessage(`recent-assistant-${index} ${"y".repeat(700)}`, 1_101 + index * 2) as never,
+        assistantMessage(
+          `recent-assistant-${index} ${"y".repeat(700)}`,
+          1_101 + index * 2,
+        ) as never,
       );
     }
 
@@ -1024,11 +1043,13 @@ describe("runCodexAppServerAttempt context-engine lifecycle", () => {
     ]);
     const inputText = getRequestInputText(harness);
     expect(inputText).toContain("OpenClaw assembled context for this turn:");
-    expect(inputText).toContain("LUNA_20K_HYDRATION_CANARY_58310472");
+    expect(inputText).toContain("LUNA_30K_CANON_HYDRATION_CANARY_58310472");
     expect(inputText).not.toContain("LUNA_OLD_CONTEXT_SHOULD_DROP");
+    expect(inputText).not.toContain("WRONG_SESSION_CANARY_MUST_NOT_LOAD");
+    expect(inputText).not.toContain("NO_REPLY_instruction");
     expect(inputText).toContain("Current user request:");
     expect(inputText).toContain("hello");
-    expect(inputText.length).toBeLessThan(85_000);
+    expect(inputText.length).toBeLessThan(125_000);
 
     await harness.completeTurn("completed", "thread-fresh-luna");
     await run;
