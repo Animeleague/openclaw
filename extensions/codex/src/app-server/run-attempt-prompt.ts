@@ -9,6 +9,7 @@ import {
   buildCodexSystemPromptReport,
   prependCodexOpenClawPromptContext,
   readContextEngineThreadBootstrapProjection,
+  readMirroredSessionHistoryMessages,
   resolveCodexDeliveryHintPreservedInputRange,
   resolveContextEngineBootstrapProjectionDecision,
 } from "./attempt-context.js";
@@ -60,6 +61,7 @@ export async function prepareCodexAttemptPrompt(context: CodexAttemptContext) {
   } = runtime;
   const {
     params,
+    sessionAgentId,
     activeContextEngine,
     usesSupervisionConnection,
     mutable,
@@ -73,22 +75,59 @@ export async function prepareCodexAttemptPrompt(context: CodexAttemptContext) {
     sandbox,
   } = connection;
   const { toolBridge } = attemptTools;
-  // FORGE_LUNA_FRESH_HYDRATION_20K_V1
-  // A newly started Luna native thread (not a warm resume) receives a bounded
-  // recent canonical tail. Keep the proof deliberately local to Luna; Sol
-  // rollover/session policy is unchanged in this stage.
-  const forgeFreshLunaHydrationMaxChars = 20_000 * 4;
+  // FORGE_LUNA_FRESH_CANON_HYDRATION_30K_V1
+  // Fresh Luna native threads hydrate once from the authoritative OpenClaw
+  // session file passed by the gateway. Never enumerate the sessions folder:
+  // params.sessionFile is the active canon even when sibling session files exist.
+  const forgeFreshLunaHydrationMaxChars = 30_000 * 4;
   const forgeRuntimeIsLuna =
-    effectiveRuntimeModelId.trim().toLowerCase().split("/").at(-1) ===
-    "gpt-5.6-luna";
-  const applyFreshThreadContinuityProjection = () => {
+    effectiveRuntimeModelId.trim().toLowerCase().split("/").at(-1) === "gpt-5.6-luna";
+  const selectFreshLunaCanonicalMessages = (messages: typeof historyState.messages) =>
+    messages.filter((message) => {
+      if (message.role !== "user" && message.role !== "assistant") {
+        return false;
+      }
+      if (message.role !== "assistant") {
+        return true;
+      }
+      const content = "content" in message ? message.content : undefined;
+      const text =
+        typeof content === "string"
+          ? content
+          : Array.isArray(content)
+            ? content
+                .flatMap((part: unknown) => {
+                  if (!part || typeof part !== "object") {
+                    return [];
+                  }
+                  const record = part as Record<string, unknown>;
+                  return record.type === "text" && typeof record.text === "string"
+                    ? [record.text]
+                    : [];
+                })
+                .join("\n")
+            : "";
+      const normalized = text.trim();
+      return normalized !== "NO_REPLY" && !normalized.startsWith("NO_REPLY_instruction");
+    });
+  const readFreshLunaCanonicalHistory = async () => {
+    const canonicalMessages = await readMirroredSessionHistoryMessages({
+      agentId: sessionAgentId,
+      sessionFile: params.sessionFile,
+      sessionId: params.sessionId,
+      sessionKey: contextSessionKey,
+    });
+    return selectFreshLunaCanonicalMessages(canonicalMessages ?? []);
+  };
+  const applyFreshThreadContinuityProjection = (
+    messages: typeof historyState.messages = historyState.messages,
+    maxRenderedContextChars = codexContextProjectionMaxChars,
+  ) => {
     const projection = projectContextEngineAssemblyForCodex({
-      assembledMessages: historyState.messages,
-      originalHistoryMessages: historyState.messages,
+      assembledMessages: messages,
+      originalHistoryMessages: messages,
       prompt: params.prompt,
-      maxRenderedContextChars: forgeRuntimeIsLuna
-        ? Math.min(codexContextProjectionMaxChars, forgeFreshLunaHydrationMaxChars)
-        : codexContextProjectionMaxChars,
+      maxRenderedContextChars,
     });
     promptState.promptText = projection.promptText;
     promptState.promptContextRange = projection.promptContextRange;
@@ -398,24 +437,39 @@ export async function prepareCodexAttemptPrompt(context: CodexAttemptContext) {
     promptState.precomputedStaleBindingContinuityProjectionApplied = projected;
     return projected;
   };
-  const applyNoContextEngineContinuityProjection = (
+  const applyNoContextEngineContinuityProjection = async (
     action: "started" | "resumed" | "forked",
     binding?: NonNullable<typeof mutable.startupBinding>,
   ) => {
-    if (activeContextEngine || !historyState.messages.some((message) => message.role === "user")) {
+    if (activeContextEngine) {
+      return false;
+    }
+    if (action === "started" && forgeRuntimeIsLuna) {
+      const canonicalMessages = await readFreshLunaCanonicalHistory();
+      if (canonicalMessages.some((message) => message.role === "user")) {
+        applyFreshThreadContinuityProjection(
+          canonicalMessages,
+          Math.min(codexContextProjectionMaxChars, forgeFreshLunaHydrationMaxChars),
+        );
+        embeddedAgentLog.info("forge fresh Luna hydrated from canonical OpenClaw session", {
+          sessionId: params.sessionId,
+          sessionFile: params.sessionFile,
+          canonicalMessages: canonicalMessages.length,
+          maxRenderedContextChars: Math.min(
+            codexContextProjectionMaxChars,
+            forgeFreshLunaHydrationMaxChars,
+          ),
+        });
+        return true;
+      }
+    }
+    if (!historyState.messages.some((message) => message.role === "user")) {
       return false;
     }
     if (action === "resumed" && promptState.precomputedStaleBindingContinuityProjectionApplied) {
       return true;
     }
     if (action === "started" && promptState.staleBindingContinuityForcedFreshStart) {
-      return true;
-    }
-    // A gateway restart or other fresh Luna sidecar must hydrate from canonical
-    // history even when an inactive bootstrap binding would normally suppress
-    // generic fresh-thread projection.
-    if (action === "started" && forgeRuntimeIsLuna) {
-      applyFreshThreadContinuityProjection();
       return true;
     }
     if (action === "started" && promptState.inactiveThreadBootstrapBindingForcedFreshStart) {
