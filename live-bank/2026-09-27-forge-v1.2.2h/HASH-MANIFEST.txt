@@ -1,0 +1,35 @@
+FORGE 1.2.2h ACCEPTED EXACT-LIVE BANK
+Accepted: 2026-09-27T17:29:53+01:00
+Repository: Animeleague/openclaw
+Branch: forge/1.2.2h-live-bank-2026-09-27
+Base: main @ 038b275b63be29d6bf294f57546d887beafcde46
+
+5ffbc9a0639350361f480077621975749be7e10bd6b18ae951ab0d5329767bdc  runtime/run-attempt-FUyOjGCV.js
+9f7eb3c6bdbdaba427858b94f7c4e7e57308a1bbf1ad92451aea83f70855467c  runtime/provider-capabilities-CDnHbmUZ.js
+692f4fe11ea71a477498cbb87c2b4915fa5d46cad524a4e18e4bdc5171555558  runtime/forge-discord-monitor-adapter.js
+855c0111038f2d5148f598d97ec5480d516894b7842f5200da90177a6848e68f  scripts/Apply-Forge-1.2.2h-VisibleSolAnchor-v1.ps1
+
+Runtime invariants:
+openclaw_version=OpenClaw 2026.7.1 (2d2ddc4)
+monitor_version=1.1.9
+sol_rollover_tokens=80000
+native_inject_items=3
+cache_diag_marker_count=3
+marker_122h=1
+marker_122f=1
+marker_122e=1
+provider_expected=9f7eb3c6bdbdaba427858b94f7c4e7e57308a1bbf1ad92451aea83f70855467c
+adapter_expected=692f4fe11ea71a477498cbb87c2b4915fa5d46cad524a4e18e4bdc5171555558
+
+Acceptance:
+sol_full_cache=PASS
+no_1k_staircase=PASS
+public_room_context=PASS
+dirty_turn_rollback=PASS
+clean_reinject=PASS
+dm_public_switching=PASS
+sol_luna_sol_continuity=PASS
+sol_cache_after_model_switch=PASS
+post_switch_no_staircase=PASS
+actual_input_rollover_accounting=PASS
+luna_unchanged=PASS
