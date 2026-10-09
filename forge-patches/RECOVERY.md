@@ -12,6 +12,30 @@ This file is for an AI rebuilding the Forge-specific OpenClaw runtime from a cle
 - Do not put private Forge data in this public repository.
 - The live Forge runtime uses the **project-local `@openclaw/codex` bundle** under `~/.openclaw/npm/projects/...`, not a stale global Codex bundle. Patches that target Codex turn assembly must prove they are modifying the executable project-local runtime.
 
+## GPT-6.1 Sol production checkpoint — 2026-10-09
+
+The canonical live model/runtime checkpoint is now documented at:
+
+- `live-bank/2026-10-09-forge-gpt-6.1-sol/README.md`
+- `live-bank/2026-10-09-forge-gpt-6.1-sol/HASH-MANIFEST.txt`
+- `forge-patches/codex-6.1-sol/COMPATIBILITY.md`
+
+Production remains on OpenClaw 2026.7.1, but the high-intelligence default is now
+`openai/gpt-6.1-sol` through official Codex 0.159.3. The ambient Luna sidecar remains available.
+
+The GPT-6.1 enablement is an **OpenClaw/Codex compatibility layer**. It did not require changes to
+the separate Forge Discord gateway, Sentry, moderation middleware, or other Animeleague plugins.
+Those plugins may independently change routing policy, but they are not prerequisites for GPT-6.1.
+
+When rebuilding the exact current production runtime, preserve the accepted Forge behavioural
+patches below and then reproduce/verify the GPT-6.1 checkpoint. Do not blindly reinstall an older
+Codex package or assume the July static model catalog can resolve GPT-6.1 without the checkpoint.
+
+When eventually upgrading OpenClaw to a release with native GPT-6.1 support, treat the checkpoint
+as a migration aid rather than a permanent patch requirement: prove native 6.1 resolution,
+thread/revert semantics, Sol/Luna continuity, transient-history cleanup, tool permissions, cache
+stability and rollover behaviour before removing obsolete compatibility shims.
+
 ## Canonical installation order
 
 1. `Patch-ForgeCodexStableToolCatalogV2.ps1`
