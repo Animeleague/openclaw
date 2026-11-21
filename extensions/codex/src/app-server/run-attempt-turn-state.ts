@@ -78,6 +78,16 @@ export function createCodexAttemptTurnState(resources: CodexAttemptResources) {
       | undefined,
     terminalDynamicToolReleaseCheckScheduled: false,
     currentTurnHadNonTerminalDynamicToolResult: false,
+    // FORGE_LUNA_ROOM_CONTEXT_TRANSACTION_V120
+    forgeLunaRoomContextTransaction: undefined as
+      | {
+          threadId: string;
+          turnId: string;
+          cleanUserText: string;
+          roomContextChars: number;
+        }
+      | undefined,
+    forgeLunaRoomContextTransactionHandled: false,
   };
   let resolveCompletion!: () => void;
   const completion = new Promise<void>((resolve) => {

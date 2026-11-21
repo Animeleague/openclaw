@@ -353,6 +353,11 @@ type CodexThreadInjectItemsParams = JsonObject & {
   items: JsonValue[];
 };
 
+type CodexThreadRollbackParams = JsonObject & {
+  threadId: string;
+  numTurns: number;
+};
+
 type CodexThreadUnsubscribeParams = JsonObject & {
   threadId: string;
 };
@@ -645,6 +650,7 @@ type CodexAppServerRequestParamsOverride = {
   "thread/turns/list": CodexThreadTurnsListParams;
   "thread/name/set": CodexThreadSetNameParams;
   "thread/read": CodexThreadReadParams;
+  "thread/rollback": CodexThreadRollbackParams;
   "thread/start": CodexThreadStartParams;
   "thread/unarchive": CodexThreadArchiveParams;
   "thread/unsubscribe": CodexThreadUnsubscribeParams;
@@ -694,6 +700,7 @@ type CodexAppServerRequestResultMap = {
   "thread/turns/list": CodexThreadTurnsListResponse;
   "thread/name/set": JsonValue;
   "thread/read": CodexThreadReadResponse;
+  "thread/rollback": JsonValue;
   "thread/resume": CodexThreadResumeResponse;
   "thread/start": CodexThreadStartResponse;
   "thread/unarchive": CodexThreadUnarchiveResponse;
