@@ -1,0 +1,9 @@
+{
+  "name": "transient-turn-context",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Provider-scoped transient runtime-context replay policy",
+  "openclaw": { "extensions": ["./index.js"] },
+  "scripts": { "test": "node --test test.mjs" }
+}

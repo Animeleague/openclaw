@@ -1,0 +1,6 @@
+Renamed package files SHA256 (verified locally):
+fc74e99ef5b787ae746418333000e731627ab44d3761124f790f620e8c55fb6d  package.json
+58f6dacf35f1bff923bb62fb7062773015c7128175401ee5d6e75a1fe7859e8e  openclaw.plugin.json
+233198386822191ace264fe44734ce0e4f1dbb2e703d77e101a30f2212214948  index.js
+55512d6667ee250e91deb0b905b28561a3a1d1940f18c7960b69a643129ff3d7  test.mjs
+Original live-tested package and exact baseline runtime hashes: commit 94a3c0b6979d95329fb9e24aa2bfe38233b766f0, original HASH-MANIFEST.txt.
