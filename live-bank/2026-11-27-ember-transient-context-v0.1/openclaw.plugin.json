@@ -1,0 +1,8 @@
+{
+  "id": "ember-transient-context",
+  "name": "Ember Transient Context (experimental)",
+  "description": "Own the configured Ember local provider and exclude historical runtime context from Gemma replay.",
+  "providers": ["local"],
+  "activation": { "onStartup": false },
+  "configSchema": { "type": "object", "additionalProperties": false, "properties": {} }
+}
